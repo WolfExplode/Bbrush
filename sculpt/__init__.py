@@ -126,12 +126,17 @@ def refresh_depth_map():
 
 def view3d_event(event):
     """视图操作"""
+    pref = get_pref()
     if event.alt:
-        bpy.ops.view3d.move("INVOKE_DEFAULT")  # 平移视图
+        # Alt-based navigation (pan) is gated behind the Alt+MMB setting.
+        if getattr(pref, "keymap_enable_alt_mmb_view_axis", True):
+            bpy.ops.view3d.move("INVOKE_DEFAULT")  # 平移视图
     elif event.ctrl:
-        bpy.ops.view3d.zoom("INVOKE_DEFAULT")  # 缩放视图
+        if getattr(pref, "keymap_enable_ctrl_rmb_drag_zoom", True):
+            bpy.ops.view3d.zoom("INVOKE_DEFAULT")  # 缩放视图
     else:
-        bpy.ops.view3d.rotate("INVOKE_DEFAULT")  # 旋转视图
+        if getattr(pref, "keymap_enable_rmb_drag_rotate", True):
+            bpy.ops.view3d.rotate("INVOKE_DEFAULT")  # 旋转视图
 
 
 class_list = [

@@ -31,6 +31,10 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
         UpdateBrushShelf.update_brush_shelf(context, event)
         active_tool = ToolSelectPanelHelper.tool_active_from_context(bpy.context)
 
+        # Cache whether the press started on a model, so we don't GPU-test every mousemove.
+        # This avoids repeated redraw_timer calls (which cause "Draw region" warnings/spinner).
+        self._press_in_model = check_mouse_in_model(context, event)
+
         if check_mouse_in_depth_map_area(event):  # 缩放深度图
             bpy.ops.sculpt.bbrush_depth_scale("INVOKE_DEFAULT")
             return {"FINISHED"}
@@ -88,7 +92,7 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
         is_release = event.value == "RELEASE"
 
         is_moving = self.check_is_moving(event)
-        is_in_modal = check_mouse_in_model(context, event)
+        is_in_modal = getattr(self, "_press_in_model", False)
         # is_in_active_modal = check_mouse_in_active_modal(context, event)  # 不能精确判断，如果物体有修改器,会影响检测
         active_tool = ToolSelectPanelHelper.tool_active_from_context(bpy.context)
 
@@ -135,13 +139,22 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
             elif is_in_modal:  # and is_in_active_modal #
                 return self.brush_stroke(context, event)
             else:  # 鼠标不在模型上
+                pref = get_pref()
                 if only_shift:
-                    bpy.ops.view3d.view_roll("INVOKE_DEFAULT", type="ANGLE")  # 倾斜视图
+                    if getattr(pref, "keymap_enable_shift_lmb_drag_skew", True):
+                        bpy.ops.view3d.view_roll("INVOKE_DEFAULT", type="ANGLE")  # 倾斜视图
+                    else:
+                        # Disabled: do nothing and exit early (avoid doing work on empty-space drag).
+                        return {"FINISHED"}
                 elif event.ctrl:  # 使用ctrl 或 ctrl shift 的笔刷
                     bpy.ops.sculpt.bbrush_shape("INVOKE_DEFAULT")
                 else:
-                    from . import view3d_event
-                    view3d_event(event)
+                    if getattr(pref, "keymap_enable_lmb_drag_rotate_empty", True):
+                        from . import view3d_event
+                        view3d_event(event)
+                    else:
+                        # Disabled: do nothing and exit early (avoid doing work on empty-space drag).
+                        return {"FINISHED"}
             return {"FINISHED"}
         return {"RUNNING_MODAL"}
 
@@ -203,5 +216,6 @@ def mouse_offset_compensation(context, event):
         now_mouse = Vector((event.mouse_x, event.mouse_y))
         left = brush_runtime.left_mouse
         offset_mouse = (left - now_mouse) * pref.drag_offset_compensation + left
-        print("mouse_offset_compensation", offset_mouse)
+        if getattr(pref, "debug", False):
+            print("mouse_offset_compensation", offset_mouse)
         context.window.cursor_warp(int(offset_mouse.x), int(offset_mouse.y))

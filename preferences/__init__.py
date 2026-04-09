@@ -8,6 +8,25 @@ from .view_navigation_property import ViewNavigationProperty
 from .. import __package__ as base_name
 
 
+class BBRUSH_OT_rebuild_keyconfig(bpy.types.Operator):
+    bl_idname = "bbrush.rebuild_keyconfig"
+    bl_label = "Rebuild BBrush Keymap"
+    bl_description = "Rebuild the add-on keymap overlay from current addon preferences"
+    bl_options = {"REGISTER"}
+
+    def execute(self, context):
+        try:
+            from ..sculpt.keymap import BrushKeymap
+            BrushKeymap.unregister_addon_keymaps()
+            BrushKeymap.register_addon_keymaps(context)
+        except Exception as e:
+            self.report({"ERROR"}, f"Failed to rebuild keymap: {getattr(e, 'args', [str(e)])[0]}")
+            return {"CANCELLED"}
+
+        self.report({"INFO"}, "BBrush keymap rebuilt.")
+        return {"FINISHED"}
+
+
 class Preferences(
     bpy.types.AddonPreferences,
 
@@ -19,6 +38,33 @@ class Preferences(
     ViewNavigationProperty,
 ):
     bl_idname = base_name
+
+    # --- Keymap toggles (used by sculpt/keymap.py + mouse operators) ---
+    keymap_enable_alt_mmb_view_axis: bpy.props.BoolProperty(
+        name="Alt + Middle Mouse: View Axis / snap",
+        description="Enable Alt+MMB viewport axis snapping/view-axis behavior",
+        default=True,
+    )
+    keymap_enable_lmb_drag_rotate_empty: bpy.props.BoolProperty(
+        name="Left Drag (empty space): Rotate View",
+        description="Enable rotating the viewport by left-dragging in empty space",
+        default=True,
+    )
+    keymap_enable_shift_lmb_drag_skew: bpy.props.BoolProperty(
+        name="Shift + Left Drag (empty space): Skew/constraint",
+        description="Enable Shift+Left-drag viewport skew/constraint behavior",
+        default=True,
+    )
+    keymap_enable_rmb_drag_rotate: bpy.props.BoolProperty(
+        name="Right Drag: Rotate View",
+        description="Enable rotating the viewport by right-dragging",
+        default=True,
+    )
+    keymap_enable_ctrl_rmb_drag_zoom: bpy.props.BoolProperty(
+        name="Ctrl + Right Drag: Zoom View",
+        description="Enable zooming the viewport by Ctrl+right-dragging",
+        default=True,
+    )
 
     def update_always_bbrush_mode(self, context):
         from ..register_module import try_toggle_bbrush_mode
@@ -84,6 +130,15 @@ class Preferences(
         ops = sub_col.operator("wm.url_open", icon="URL", text="Encountering a problem?")
         ops.url = "https://github.com/AIGODLIKE/Bbrush/issues/new"
 
+        keymap_box = col.box()
+        keymap_box.label(text="Keymap (overlay)")
+        keymap_box.prop(self, "keymap_enable_alt_mmb_view_axis")
+        keymap_box.prop(self, "keymap_enable_lmb_drag_rotate_empty")
+        keymap_box.prop(self, "keymap_enable_shift_lmb_drag_skew")
+        keymap_box.prop(self, "keymap_enable_rmb_drag_rotate")
+        keymap_box.prop(self, "keymap_enable_ctrl_rmb_drag_zoom")
+        keymap_box.operator(BBRUSH_OT_rebuild_keyconfig.bl_idname)
+
         split = col.split()
 
         column = split.column()
@@ -97,8 +152,10 @@ class Preferences(
 
 
 def register():
+    bpy.utils.register_class(BBRUSH_OT_rebuild_keyconfig)
     bpy.utils.register_class(Preferences)
 
 
 def unregister():
     bpy.utils.unregister_class(Preferences)
+    bpy.utils.unregister_class(BBRUSH_OT_rebuild_keyconfig)

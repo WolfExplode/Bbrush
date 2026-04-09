@@ -539,8 +539,20 @@ class BrushShape(bpy.types.Operator, ShapeUpdate):
 
     def modal(self, context, event):
         """拖动的时候不在模型上拖,执行其它操作"""
-        print("drag_event", self.shape, self.is_reverse, len(self.mouse_route), len(self.mouse_route_convex_shell),
-              event.value, event.type)
+        try:
+            from ...utils import get_pref
+            if getattr(get_pref(), "debug", False):
+                print(
+                    "drag_event",
+                    self.shape,
+                    self.is_reverse,
+                    len(self.mouse_route),
+                    len(self.mouse_route_convex_shell),
+                    event.value,
+                    event.type,
+                )
+        except Exception:
+            ...
 
         self.is_reverse = event.alt
 

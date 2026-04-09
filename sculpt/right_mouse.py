@@ -1,7 +1,7 @@
 import bpy
 
 from .brush import BrushShortcutKeyScale
-from ..utils import check_mouse_in_depth_map_area, check_mouse_in_shortcut_key_area
+from ..utils import check_mouse_in_depth_map_area, check_mouse_in_shortcut_key_area, get_pref
 from ..utils.manually_manage_events import ManuallyManageEvents
 
 
@@ -21,7 +21,11 @@ class RightMouse(bpy.types.Operator, ManuallyManageEvents):
         elif check_mouse_in_shortcut_key_area(event) and BrushShortcutKeyScale.poll(context):
             bpy.ops.sculpt.bbrush_shortcut_key_move("INVOKE_DEFAULT")
             return {"FINISHED"}
-        print(self.bl_idname)
+        try:
+            if getattr(get_pref(), "debug", False):
+                print(self.bl_idname)
+        except Exception:
+            ...
 
         context.window_manager.modal_handler_add(self)
         self.start_manually_manage_events(event)
@@ -40,6 +44,12 @@ class RightMouse(bpy.types.Operator, ManuallyManageEvents):
             finally:  # 反直觉写法
                 return {"FINISHED"}
         elif is_moving:  # 不能使用PASSTHROUGH,需要手动指定事件
+            pref = get_pref()
+            # Gate based on modifier, so users can disable specific behaviors.
+            if event.ctrl and not getattr(pref, "keymap_enable_ctrl_rmb_drag_zoom", True):
+                return {"PASS_THROUGH"}
+            if (not event.ctrl) and (not event.alt) and (not getattr(pref, "keymap_enable_rmb_drag_rotate", True)):
+                return {"PASS_THROUGH"}
             view3d_event(event)
             return {"FINISHED"}
         return {"RUNNING_MODAL"}

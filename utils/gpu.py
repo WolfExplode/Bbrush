@@ -20,7 +20,12 @@ def _depth_content_ratio(numpy_buffer, *, near_eps=1e-5, far_eps=1e-4):
 
 def _depth_buffer_indicates_model(numpy_buffer):
     cr = _depth_content_ratio(numpy_buffer)
-    print("check depth_content_ratio", cr)
+    try:
+        from . import get_pref
+        if getattr(get_pref(), "debug", False):
+            print("check depth_content_ratio", cr)
+    except Exception:
+        ...
     return cr >= DEPTH_CONTENT_RATIO_THRESHOLD
 
 

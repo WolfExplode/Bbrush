@@ -46,7 +46,9 @@ def lasso_hide(
         'EXEC_DEFAULT', True,
         path=path,
         action="HIDE",
-        area="OUTSIDE" if is_reverse else "Inside",
+        # Default behavior should isolate the gesture area (hide outside).
+        # Holding Alt inverts to "hide inside".
+        area="Inside" if is_reverse else "OUTSIDE",
         use_front_faces_only=use_front_faces_only,
     )
 
@@ -273,8 +275,6 @@ class DragBase(DragDraw):
     brush_mode = None
     active_tool = None
     shape = None  # ELLIPSE,BOX,POLYLINE,LASSO,CIRCULAR
-    _area_cast_request = None
-    _area_in_model = True
 
     def start_drag_event(self, context, event):
         from .. import brush_runtime
@@ -285,8 +285,6 @@ class DragBase(DragDraw):
             self.brush_mode = brush_runtime.brush_mode
             self.register_draw()
             self.start_draw(context, event)
-            self._area_cast_request = {"ready": True, "is_in_model": True, "handler": None, "rect": None}
-            self._area_in_model = True
             self.start_move()
             return True
         else:
@@ -300,54 +298,30 @@ class DragBase(DragDraw):
         self.move_confirm(context, event)
         refresh_ui(context)
         drag_runtime = None
-        # Cancel any pending GPU sample handler.
-        if isinstance(self._area_cast_request, dict) and self._area_cast_request.get("handler") is not None:
-            try:
-                bpy.types.SpaceView3D.draw_handler_remove(self._area_cast_request["handler"], "WINDOW")
-            except Exception:
-                pass
-        self._area_cast_request = None
-
-    def _schedule_area_in_model_check(self, context):
-        """Schedule depth-buffer hit testing on next redraw and cache the last result."""
-        from ...utils.gpu import schedule_area_ray_cast
-
-        req = self._area_cast_request
-        if not isinstance(req, dict):
-            return
-
-        if self.shape == "BOX":
-            x1, y1 = self.mouse_start
-            x2, y2 = self.mouse
-            w, h = self.mouse_start - self.mouse
-            schedule_area_ray_cast(context, min(x1, x2), min(y1, y2), abs(w), abs(h), req)
-        else:
-            if len(self.mouse_route) < 2:
-                return
-            data = np.array(self.mouse_route, dtype=np.float32)
-            data.reshape((data.__len__(), 2))
-            max_co = data.max(axis=0)
-            min_co = data.min(axis=0)
-            x = int(min_co[0])
-            y = int(min_co[1])
-            w = int(max_co[0] - x)
-            h = int(max_co[1] - y)
-            schedule_area_ray_cast(context, x, y, w, h, req)
-
-        if req.get("ready"):
-            self._area_in_model = bool(req.get("is_in_model", False))
 
     def get_shape_in_model_up(self, context):
-        # Updated continuously during drag by _schedule_area_in_model_check().
-        return bool(self._area_in_model)
+        data = np.array(self.mouse_route, dtype=np.float32)
+        data.reshape((data.__len__(), 2))
+        max_co = data.max(axis=0)
+        min_co = data.min(axis=0)
+        x = int(min_co[0])
+        y = int(min_co[1])
+        w = int(max_co[0] - x)
+        h = int(max_co[1] - y)
+
+        return check_area_in_model(context, x, y, w, h)
 
     def check_brush_in_model(self, context) -> bool:
         """检查绘制的笔刷是否画在了模型上"""
         if self.shape == "BOX":
-            return bool(self._area_in_model)
+            x1, y1 = self.mouse_start
+            x2, y2 = self.mouse
+            w, h = self.mouse_start - self.mouse
+            in_modal = check_area_in_model(context, min(x1, x2), min(y1, y2), abs(w), abs(h))
+            return in_modal
         else:
             if len(self.mouse_route) > 2:
-                return bool(self._area_in_model)
+                return self.get_shape_in_model_up(context)
             else:
                 return True
 
@@ -397,7 +371,9 @@ class DragBase(DragDraw):
             elif self.brush_mode == "HIDE":
                 if in_model:
                     if is_move_mouse:
-                        lasso_hide(self.mouse_route_convex_shell, self.is_reverse, False)
+                        # Keep behavior consistent with mask gestures: honor the tool's
+                        # "front faces only" setting for hide gestures too.
+                        lasso_hide(self.mouse_route_convex_shell, self.is_reverse, use_front_faces_only)
                 else:
                     sculpt_invert_hide_face()
         return {"FINISHED"}
@@ -407,7 +383,6 @@ class ShapeUpdate(DragBase):
 
     def update_box_shape(self, context, event):
         self.mouse = Vector((event.mouse_region_x, event.mouse_region_y))
-        self._schedule_area_in_model_check(context)
 
     def update_lasso_shape(self, context, event):
         mouse = Vector((event.mouse_region_x, event.mouse_region_y))
@@ -422,7 +397,6 @@ class ShapeUpdate(DragBase):
                 self.preview_area(lines)
 
                 self.mouse_route.append(mouse)
-                self._schedule_area_in_model_check(context)
                 return True
             except (ValueError, KeyError) as e:
                 debug_log(e.__repr__())
@@ -436,7 +410,6 @@ class ShapeUpdate(DragBase):
         try:
             self.mouse_route_convex_shell = lines = line_to_convex_shell(preview_mouse_route)
             self.preview_area(lines)
-            self._schedule_area_in_model_check(context)
             return True
         except (ValueError, KeyError) as e:
             debug_log(e.__repr__())
@@ -452,7 +425,6 @@ class ShapeUpdate(DragBase):
 
         self.mouse_route_convex_shell = self.mouse_route = draw_data
         self.preview_area(draw_data)
-        self._schedule_area_in_model_check(context)
 
     def update_ellipse_shape(self, context, event):
         self.mouse = Vector((event.mouse_region_x, event.mouse_region_y))
@@ -464,7 +436,6 @@ class ShapeUpdate(DragBase):
 
         self.mouse_route_convex_shell = self.mouse_route = draw_data
         self.preview_area(draw_data)
-        self._schedule_area_in_model_check(context)
 
     def polyline_update(self, context, event) -> "set|None":
         is_press = event.value == "PRESS"

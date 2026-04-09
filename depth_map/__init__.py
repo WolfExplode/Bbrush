@@ -1,10 +1,8 @@
-import time
-
 import bpy
 from mathutils import Vector
 
 from .gpu_buffer import draw_gpu_buffer
-from ..debug import debug_log, is_debug_enabled
+from ..debug import debug_log
 from ..utils import get_pref, get_region_height, get_region_width, check_display_mode_is_draw
 
 handel = None
@@ -24,7 +22,6 @@ def check_depth_map_is_draw(context):
 
 
 def draw_depth():
-    t0 = time.time() if is_debug_enabled() else None
     global depth_buffer_check
     context = bpy.context
 
@@ -36,9 +33,6 @@ def draw_depth():
             depth_buffer_check["draw_error"] = draw_error
     elif depth_buffer_check:
         depth_buffer_check = {}
-
-    if t0 is not None:
-        debug_log("draw_depth time:", time.time() - t0)
 
 
 def filling_data(context):

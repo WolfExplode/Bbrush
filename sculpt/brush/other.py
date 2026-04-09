@@ -43,8 +43,8 @@ def ellipse_mask():
 def circular_hide():
     return dict(
         idname="builtin.circular_hide",
-        label="Circular mask",
-        description="Draw circular mask",
+        label="Circular hide",
+        description="Hide geometry in a circle (Alt: invert inside/outside)",
         icon=get_dat_icon("brush.sculpt.circular_hide"),
         cursor="PAINT_CROSS",
         widget=None,
@@ -56,8 +56,8 @@ def circular_hide():
 def ellipse_hide():
     return dict(
         idname="builtin.ellipse_hide",
-        label="Ellipse mask",
-        description="Draw elliptical mask",
+        label="Ellipse hide",
+        description="Hide geometry in an ellipse (Alt: invert inside/outside)",
         icon=get_dat_icon("brush.sculpt.ellipse_hide"),
         cursor="PAINT_CROSS",
         widget=None,

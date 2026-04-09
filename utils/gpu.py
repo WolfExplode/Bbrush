@@ -11,6 +11,48 @@ from ..debug import debug_log
 DEPTH_CONTENT_RATIO_THRESHOLD = 0.08
 
 
+def _get_framebuffer_extent():
+    """Return (width, height) for the active framebuffer read area.
+
+    Prefer viewport/scissor extents if available. This is used only to clamp
+    read_depth rectangles to valid bounds (avoids ValueError).
+    """
+    try:
+        # viewport_get/scissor_get return (x, y, w, h)
+        if hasattr(gpu.state, "viewport_get"):
+            _x, _y, w, h = gpu.state.viewport_get()
+            return int(w), int(h)
+        if hasattr(gpu.state, "scissor_get"):
+            _x, _y, w, h = gpu.state.scissor_get()
+            return int(w), int(h)
+    except Exception:
+        pass
+    return None
+
+
+def _clamp_read_rect(x: int, y: int, w: int, h: int):
+    """Clamp a read_depth rect to framebuffer extent. Returns (x,y,w,h) or None if empty."""
+    if w <= 0 or h <= 0:
+        return None
+    extent = _get_framebuffer_extent()
+    if not extent:
+        # No reliable extent; let read_depth throw if invalid.
+        return x, y, w, h
+    fb_w, fb_h = extent
+    if fb_w <= 0 or fb_h <= 0:
+        return None
+
+    # Clamp origin.
+    x0 = max(0, min(int(x), fb_w))
+    y0 = max(0, min(int(y), fb_h))
+    # Clamp size so x0+w0 <= fb_w, y0+h0 <= fb_h.
+    w0 = max(0, min(int(w), fb_w - x0))
+    h0 = max(0, min(int(h), fb_h - y0))
+    if w0 <= 0 or h0 <= 0:
+        return None
+    return x0, y0, w0, h0
+
+
 def _depth_content_ratio(numpy_buffer, *, near_eps=1e-5, far_eps=1e-4):
     """返回扁平深度数组中视为有几何深度的像素比例（0–1）。"""
     d = np.asarray(numpy_buffer, dtype=np.float32).ravel()
@@ -24,35 +66,6 @@ def _depth_buffer_indicates_model(numpy_buffer):
     cr = _depth_content_ratio(numpy_buffer)
     debug_log("check depth_content_ratio", cr)
     return cr >= DEPTH_CONTENT_RATIO_THRESHOLD
-
-
-def _clamp_rect_to_viewport(x: int, y: int, w: int, h: int):
-    """Clamp a depth read rectangle to the current GPU viewport.
-
-    Prevents `read_depth` from throwing when x/y/w/h extend outside the framebuffer.
-    Returns (x, y, w, h) or None if the clamped rect is empty.
-    """
-    try:
-        vx, vy, vw, vh = gpu.state.viewport_get()
-    except Exception:
-        # Fallback: assume origin viewport. (Older builds should still have viewport_get.)
-        vx, vy, vw, vh = 0, 0, 0, 0
-
-    # If viewport size is unavailable, keep original values and let Blender raise/log.
-    if vw <= 0 or vh <= 0:
-        return x, y, w, h
-
-    # Clamp start.
-    x0 = max(vx, min(x, vx + vw - 1))
-    y0 = max(vy, min(y, vy + vh - 1))
-
-    # Clamp size so end stays inside.
-    w0 = min(w, (vx + vw) - x0)
-    h0 = min(h, (vy + vh) - y0)
-
-    if w0 <= 0 or h0 <= 0:
-        return None
-    return x0, y0, w0, h0
 
 
 def get_gpu_buffer(xy, wh=(1, 1), centered=False):
@@ -76,9 +89,9 @@ def get_gpu_buffer(xy, wh=(1, 1), centered=False):
         x -= w // 2
         y -= h // 2
 
-    rect = _clamp_rect_to_viewport(x, y, w, h)
+    rect = _clamp_read_rect(x, y, w, h)
     if rect is None:
-        return None
+        raise ValueError("Trying to read depth outside the extent of the framebuffer")
     x, y, w, h = rect
     return gpu.state.active_framebuffer_get().read_depth(x, y, w, h)
 
@@ -87,12 +100,14 @@ def gpu_depth_ray_cast(x, y, data):
     """按区域内有效深度像素占比判断是否命中模型（见 DEPTH_CONTENT_RATIO_THRESHOLD）。"""
     from . import get_pref
     size = get_pref().depth_ray_size
-    _buffer = get_gpu_buffer((x, y), wh=(size, size), centered=True)
-    if _buffer is None:
+    try:
+        _buffer = get_gpu_buffer((x, y), wh=(size, size), centered=True)
+        numpy_buffer = np.asarray(_buffer, dtype=np.float32).ravel()
+        data['is_in_model'] = _depth_buffer_indicates_model(numpy_buffer)
+    except Exception as e:
+        # Out-of-bounds reads can happen during gestures near/over the viewport edge.
+        debug_log("gpu_depth_ray_cast failed:", repr(e))
         data['is_in_model'] = False
-        return
-    numpy_buffer = np.asarray(_buffer, dtype=np.float32).ravel()
-    data['is_in_model'] = _depth_buffer_indicates_model(numpy_buffer)
 
 
 def get_mouse_location_ray_cast(context, x, y):
@@ -119,12 +134,13 @@ def get_area_ray_cast(context, x, y, w, h):
         return get_mouse_location_ray_cast(context, x, y)
 
     def get_ray_cast():
-        buffer = get_gpu_buffer((x, y), wh=(w, h), centered=False)
-        if buffer is None:
+        try:
+            buffer = get_gpu_buffer((x, y), wh=(w, h), centered=False)
+            numpy_buffer = np.asarray(buffer, dtype=np.float32).ravel()
+            data['is_in_model'] = _depth_buffer_indicates_model(numpy_buffer)
+        except Exception as e:
+            debug_log("get_area_ray_cast failed:", repr(e), "rect", (x, y, w, h))
             data['is_in_model'] = False
-            return
-        numpy_buffer = np.asarray(buffer, dtype=np.float32).ravel()
-        data['is_in_model'] = _depth_buffer_indicates_model(numpy_buffer)
 
     view3d = context.space_data
     show_xray = view3d.shading.show_xray
@@ -138,85 +154,6 @@ def get_area_ray_cast(context, x, y, w, h):
             bpy.types.SpaceView3D.draw_handler_remove(handler, 'WINDOW')
         view3d.shading.show_xray = show_xray
     return data.get('is_in_model', False)
-
-
-def schedule_area_ray_cast(context, x, y, w, h, request: dict) -> None:
-    """Schedule a one-shot GPU depth read on the next natural redraw.
-
-    This avoids `bpy.ops.wm.redraw_timer(...)` (which can spam Blender's "Draw region" warnings),
-    while keeping the same depth-buffer based hit testing.
-
-    `request` is a mutable dict used to store state:
-      - ready: bool
-      - is_in_model: bool
-      - handler: draw handler token (internal)
-      - rect: (x, y, w, h) last requested rect
-      - _show_xray: original xray state for restore
-    """
-    if request is None:
-        return
-
-    # Normalize inputs.
-    x, y, w, h = int(x), int(y), int(w), int(h)
-    rect = (x, y, w, h)
-
-    # If there's already a pending request for the same rect, do nothing.
-    if (not request.get("ready", True)) and request.get("rect") == rect:
-        if context.area:
-            context.area.tag_redraw()
-        return
-
-    # Cancel any previous handler.
-    handler = request.get("handler")
-    if handler is not None:
-        try:
-            bpy.types.SpaceView3D.draw_handler_remove(handler, "WINDOW")
-        except Exception as e:
-            debug_log("schedule_area_ray_cast: remove previous handler failed:", repr(e))
-        request["handler"] = None
-
-    request["rect"] = rect
-    request["ready"] = False
-
-    # Temporarily disable x-ray for the sample.
-    view3d = getattr(context, "space_data", None)
-    if view3d is not None and getattr(view3d, "shading", None) is not None:
-        request["_show_xray"] = bool(view3d.shading.show_xray)
-        view3d.shading.show_xray = False
-
-    def _one_shot():
-        try:
-            buffer = get_gpu_buffer((x, y), wh=(w, h), centered=False)
-            if buffer is None:
-                request["is_in_model"] = False
-            else:
-                numpy_buffer = np.asarray(buffer, dtype=np.float32).ravel()
-                request["is_in_model"] = _depth_buffer_indicates_model(numpy_buffer)
-        except Exception as e:
-            debug_log("schedule_area_ray_cast: sample failed:", repr(e))
-            request["is_in_model"] = False
-        finally:
-            request["ready"] = True
-            hnd = request.get("handler")
-            if hnd is not None:
-                try:
-                    bpy.types.SpaceView3D.draw_handler_remove(hnd, "WINDOW")
-                except Exception:
-                    pass
-                request["handler"] = None
-
-            # Restore x-ray.
-            if view3d is not None and getattr(view3d, "shading", None) is not None:
-                try:
-                    view3d.shading.show_xray = bool(request.get("_show_xray", False))
-                except Exception:
-                    pass
-
-    request["handler"] = bpy.types.SpaceView3D.draw_handler_add(_one_shot, (), "WINDOW", "POST_PIXEL")
-
-    # Ask Blender to redraw naturally.
-    if context.area:
-        context.area.tag_redraw()
 
 
 def draw_text(x,

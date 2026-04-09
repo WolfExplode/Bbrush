@@ -9,7 +9,7 @@ try:
     if gpu.platform.device_type_get() != "AMD":
         default_depth_display_mode = "ONLY_SCULPT"
 except Exception:
-    ...
+    pass
 
 
 class DepthMap:

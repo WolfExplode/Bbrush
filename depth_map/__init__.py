@@ -3,9 +3,9 @@ import time
 import bpy
 from mathutils import Vector
 
-from .gpu_buffer import draw_gpu_buffer, clear_gpu_cache
-from ..debug import DEBUG_DEPTH_MAP
-from ..utils import get_pref, is_bbruse_mode, get_region_height, get_region_width, check_display_mode_is_draw
+from .gpu_buffer import draw_gpu_buffer
+from ..debug import debug_log, is_debug_enabled
+from ..utils import get_pref, get_region_height, get_region_width, check_display_mode_is_draw
 
 handel = None
 
@@ -24,8 +24,7 @@ def check_depth_map_is_draw(context):
 
 
 def draw_depth():
-    if DEBUG_DEPTH_MAP:
-        start_time = time.time()
+    t0 = time.time() if is_debug_enabled() else None
     global depth_buffer_check
     context = bpy.context
 
@@ -33,16 +32,13 @@ def draw_depth():
         filling_data(context)
 
         if draw_error := draw_gpu_buffer(context, depth_buffer_check):
-            print(draw_error)
+            debug_log(draw_error)
             depth_buffer_check["draw_error"] = draw_error
-        """
-        draw_gpu_buffer_new_buffer_funcs(sam_width, sam_height, width, height, sampling)
-        """
     elif depth_buffer_check:
         depth_buffer_check = {}
 
-    if DEBUG_DEPTH_MAP:
-        print("draw_depth time:", time.time() - start_time)
+    if t0 is not None:
+        debug_log("draw_depth time:", time.time() - t0)
 
 
 def filling_data(context):
@@ -84,22 +80,6 @@ def filling_data(context):
     w = 1 / width * x1
     h = 1 / height * (y1 + draw_height)
     depth_buffer_check["translate"] = w, h, 0
-
-
-update_depth_map_modal_operators_len = 0  # 更新深度图用
-
-
-def update_depth_map_by_modal_operators() -> bool:
-    """在移动缩放这些操作符会向场景的modal_operators添加操作符运行时
-    用这个来进行判断并刷新"""
-    global update_depth_map_modal_operators_len
-    modal_operators_len = len(bpy.context.window.modal_operators)
-    if update_depth_map_modal_operators_len != modal_operators_len:
-        if modal_operators_len == 0:
-            update_depth_map_modal_operators_len = modal_operators_len
-            return True
-
-    return False
 
 
 def register():

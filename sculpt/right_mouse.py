@@ -1,6 +1,7 @@
 import bpy
 
-from ..utils import check_mouse_in_depth_map_area, get_pref
+from ..debug import debug_log
+from ..utils import check_mouse_in_depth_map_area
 from ..utils.manually_manage_events import ManuallyManageEvents
 
 
@@ -17,11 +18,7 @@ class RightMouse(bpy.types.Operator, ManuallyManageEvents):
         if check_mouse_in_depth_map_area(event):
             bpy.ops.sculpt.bbrush_depth_move("INVOKE_DEFAULT")
             return {"FINISHED"}
-        try:
-            if getattr(get_pref(), "debug", False):
-                print(self.bl_idname)
-        except Exception:
-            ...
+        debug_log(self.bl_idname)
 
         context.window_manager.modal_handler_add(self)
         self.start_manually_manage_events(event)

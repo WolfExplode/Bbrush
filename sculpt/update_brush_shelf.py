@@ -4,7 +4,7 @@ from bl_ui.space_toolsystem_toolbar import VIEW3D_PT_tools_active
 from bpy.utils.toolsystem import ToolDef
 
 from .brush import other
-from ..debug import DEBUG_UPDATE_BRUSH_SHELF
+from ..debug import debug_log
 from ..utils import refresh_ui, get_active_tool
 
 active_brush_toolbar = {  # 记录活动笔刷的名称
@@ -128,9 +128,7 @@ class UpdateBrushShelf(bpy.types.Operator):
     def update_brush_shelf(cls, context, event):
         """更新笔刷资产架"""
         if context.space_data is None:
-            # 可能在切换窗口
-            # return
-            ...
+            return
 
         if event is None:
             key = (False, False, False)
@@ -138,9 +136,8 @@ class UpdateBrushShelf(bpy.types.Operator):
             key = (event.ctrl, event.alt, event.shift)
         mode = BRUSH_SHELF_MODE[key]  # 使用组合键来确认是否需要更新笔刷工具架
 
-        if DEBUG_UPDATE_BRUSH_SHELF:
-            ev = event
-            print(cls.bl_idname, "\t", mode, "\t", getattr(ev, "type", None), getattr(ev, "value", None))
+        ev = event
+        debug_log(cls.bl_idname, "\t", mode, "\t", getattr(ev, "type", None), getattr(ev, "value", None))
 
         (active_tool, work_space_tool, index) = get_active_tool(context)
 
@@ -168,10 +165,7 @@ class UpdateBrushShelf(bpy.types.Operator):
     def restore_brush_shelf():
         """恢复笔刷工具架"""
         global brush_shelf
-        if DEBUG_UPDATE_BRUSH_SHELF:
-            # import traceback
-            # traceback.print_stack()
-            print("restore_brush_shelf", brush_shelf.keys())
+        debug_log("restore_brush_shelf", brush_shelf.keys())
         if "ORIGINAL" in brush_shelf.keys():
             set_brush_shelf("ORIGINAL")
 
@@ -198,12 +192,11 @@ class UpdateBrushShelf(bpy.types.Operator):
 
         reorder_hide()
 
-        if DEBUG_UPDATE_BRUSH_SHELF:
-            print("start_brush_shelf", brush_shelf.keys())
+        debug_log("start_brush_shelf", brush_shelf.keys())
 
 
 def try_restore_brush_shelf():
     global brush_shelf
     if "ORIGINAL" in brush_shelf.keys():
         UpdateBrushShelf.restore_brush_shelf()
-        print("try_restore_brush_shelf ok")
+        debug_log("try_restore_brush_shelf ok")

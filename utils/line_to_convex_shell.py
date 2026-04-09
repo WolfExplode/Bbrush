@@ -1,5 +1,7 @@
 import bpy
 from mathutils import Vector
+
+from ..debug import debug_log
 from mathutils import geometry
 
 
@@ -96,7 +98,7 @@ def line_to_convex_shell(pos, link=False):
         try:
             from_idx = pos.index(find_point)
         except Exception as e:
-            print(e)
+            debug_log(e)
             from_idx = -9999
     else:
         from_idx = end1_idx

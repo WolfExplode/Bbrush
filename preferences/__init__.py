@@ -23,6 +23,41 @@ class BBRUSH_OT_rebuild_keyconfig(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class BBRUSH_OT_debug_toggle_console(bpy.types.Operator):
+    bl_idname = "bbrush.debug_toggle_console"
+    bl_label = "System Console"
+    bl_description = "Show or hide Blender's system console (Windows; logs appear here when Debug is on)"
+    bl_options = {"REGISTER"}
+
+    def execute(self, context):
+        bpy.ops.wm.console_toggle()
+        self.report({"INFO"}, "Toggled system console.")
+        return {"FINISHED"}
+
+
+class BBRUSH_OT_debug_print_state(bpy.types.Operator):
+    bl_idname = "bbrush.debug_print_state"
+    bl_label = "Print State"
+    bl_description = "Print current Bbrush runtime state to the system console"
+    bl_options = {"REGISTER"}
+
+    def execute(self, context):
+        from ..sculpt import brush_runtime
+        from ..sculpt import keymap as bbrush_keymap
+        from ..sculpt.update_brush_shelf import brush_shelf
+
+        lines = (
+            f"context.mode={context.mode!r}",
+            f"brush_runtime={brush_runtime!r}",
+            f"addon_keymap_items={len(bbrush_keymap.keys)}",
+            f"brush_shelf_keys={list(brush_shelf.keys())}",
+        )
+        for line in lines:
+            print("BBrush debug:", line)
+        self.report({"INFO"}, "State printed to system console.")
+        return {"FINISHED"}
+
+
 class Preferences(
     bpy.types.AddonPreferences,
 
@@ -47,7 +82,11 @@ class Preferences(
     )
 
     refresh_fps: bpy.props.IntProperty(name="Refresh FPS", default=1, min=1, max=120)
-    debug: bpy.props.BoolProperty(name="Debug", default=False)
+    debug: bpy.props.BoolProperty(
+        name="Debug logging",
+        description="Print Bbrush diagnostic messages to the system console",
+        default=False,
+    )
 
     @property
     def refresh_interval(self):
@@ -72,14 +111,25 @@ class Preferences(
         sub_col = box.column()
         sub_col.operator(FixBbrushError.bl_idname)
 
+        dbg = col.box()
+        dbg.label(text="Debug")
+        dbg.prop(self, "debug")
+        row = dbg.row(align=True)
+        row.operator(BBRUSH_OT_debug_toggle_console.bl_idname)
+        row.operator(BBRUSH_OT_debug_print_state.bl_idname)
+
         self.draw_depth(col)
 
 
 def register():
     bpy.utils.register_class(BBRUSH_OT_rebuild_keyconfig)
+    bpy.utils.register_class(BBRUSH_OT_debug_toggle_console)
+    bpy.utils.register_class(BBRUSH_OT_debug_print_state)
     bpy.utils.register_class(Preferences)
 
 
 def unregister():
     bpy.utils.unregister_class(Preferences)
+    bpy.utils.unregister_class(BBRUSH_OT_debug_print_state)
+    bpy.utils.unregister_class(BBRUSH_OT_debug_toggle_console)
     bpy.utils.unregister_class(BBRUSH_OT_rebuild_keyconfig)

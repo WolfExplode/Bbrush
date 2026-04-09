@@ -1,6 +1,6 @@
 import bpy
 
-from ...debug import DEBUG_CLICK
+from ...debug import debug_log
 from ...utils import is_bbruse_mode, check_mouse_in_model
 
 
@@ -17,8 +17,7 @@ class BrushClick(bpy.types.Operator):
         from .. import brush_runtime
         is_in_modal = check_mouse_in_model(context, event)
 
-        if DEBUG_CLICK:
-            print(self.bl_idname, is_in_modal, brush_runtime.brush_mode)
+        debug_log(self.bl_idname, is_in_modal, brush_runtime.brush_mode)
         if brush_runtime.brush_mode == "MASK":
             if is_in_modal:
                 if event.alt and event.ctrl:

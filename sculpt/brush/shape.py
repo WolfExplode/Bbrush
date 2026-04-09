@@ -9,7 +9,7 @@ from gpu_extras.batch import batch_for_shader
 from mathutils import Vector
 
 from ...adapter import sculpt_invert_hide_face
-from ...debug import DEBUG_SHAPE
+from ...debug import debug_log
 from ...utils import (
     check_mouse_in_model,
     check_area_in_model,
@@ -373,8 +373,6 @@ class DragBase(DragDraw):
                         lasso_hide(self.mouse_route_convex_shell, self.is_reverse, False)
                 else:
                     sculpt_invert_hide_face()
-        else:
-            ...
         return {"FINISHED"}
 
 
@@ -398,7 +396,7 @@ class ShapeUpdate(DragBase):
                 self.mouse_route.append(mouse)
                 return True
             except (ValueError, KeyError) as e:
-                print(e.__repr__())
+                debug_log(e.__repr__())
                 return False
 
     def update_polyline_shape(self, context, event):
@@ -411,7 +409,7 @@ class ShapeUpdate(DragBase):
             self.preview_area(lines)
             return True
         except (ValueError, KeyError) as e:
-            print(e.__repr__())
+            debug_log(e.__repr__())
             return False
 
     def update_circular_shape(self, context, event):
@@ -509,8 +507,7 @@ class BrushShape(bpy.types.Operator, ShapeUpdate):
         is_in_modal = check_mouse_in_model(context, event)
         active_tool = ToolSelectPanelHelper.tool_active_from_context(bpy.context)
 
-        if DEBUG_SHAPE:
-            print(self.bl_idname, is_in_modal, self.brush_mode, active_tool.idname)
+        debug_log(self.bl_idname, is_in_modal, self.brush_mode, active_tool.idname)
 
         if self.__class__.draw_handle is not None:
             return {"FINISHED"}
@@ -539,20 +536,15 @@ class BrushShape(bpy.types.Operator, ShapeUpdate):
 
     def modal(self, context, event):
         """拖动的时候不在模型上拖,执行其它操作"""
-        try:
-            from ...utils import get_pref
-            if getattr(get_pref(), "debug", False):
-                print(
-                    "drag_event",
-                    self.shape,
-                    self.is_reverse,
-                    len(self.mouse_route),
-                    len(self.mouse_route_convex_shell),
-                    event.value,
-                    event.type,
-                )
-        except Exception:
-            ...
+        debug_log(
+            "drag_event",
+            self.shape,
+            self.is_reverse,
+            len(self.mouse_route),
+            len(self.mouse_route_convex_shell),
+            event.value,
+            event.type,
+        )
 
         self.is_reverse = event.alt
 

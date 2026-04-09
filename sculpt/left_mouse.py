@@ -3,7 +3,7 @@ from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
 from mathutils import Vector
 
 from .brush import BrushShape
-from ..debug import DEBUG_LEFT_MOUSE
+from ..debug import debug_log
 from ..utils import object_ray_cast, check_mouse_in_model, is_bbruse_mode, get_pref, check_modal_operators, \
     check_mouse_in_depth_map_area
 from ..utils.manually_manage_events import ManuallyManageEvents
@@ -72,12 +72,12 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
         self.start_manually_manage_events(event)
 
         in_run = check_modal_operators(self.bl_idname)
-        if DEBUG_LEFT_MOUSE:
-            print("left mouse",
-                  self.bl_idname, in_run,
-                  "\t", event.value, event.type,
-                  "\t", event.value_prev, event.type_prev,
-                  )
+        debug_log(
+            "left mouse",
+            self.bl_idname, in_run,
+            "\t", event.value, event.type,
+            "\t", event.value_prev, event.type_prev,
+        )
 
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
@@ -94,8 +94,7 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
         active_tool = ToolSelectPanelHelper.tool_active_from_context(bpy.context)
 
         if is_release:  # 单击
-            if DEBUG_LEFT_MOUSE:
-                print("is_release", is_in_modal)
+            debug_log("is_release", is_in_modal)
             if is_in_modal:  # 点在了其它模型上and not is_in_active_modal
                 try:
                     res = bpy.ops.object.transfer_mode("INVOKE_DEFAULT")  # object.transfer_mode 使用的c端gpu buffer检测
@@ -107,8 +106,7 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
                 bpy.ops.sculpt.bbrush_click("INVOKE_DEFAULT")
                 return {"FINISHED"}  # 反直觉写法
         elif is_moving:  # 拖动不能使用PASSTHROUGH,需要手动指定事件
-            if DEBUG_LEFT_MOUSE:
-                print("is_move", is_in_modal)
+            debug_log("is_move", is_in_modal)
 
             only_shift = event.shift and not event.alt and not event.ctrl
 
@@ -205,6 +203,5 @@ def mouse_offset_compensation(context, event):
         now_mouse = Vector((event.mouse_x, event.mouse_y))
         left = brush_runtime.left_mouse
         offset_mouse = (left - now_mouse) * pref.drag_offset_compensation + left
-        if getattr(pref, "debug", False):
-            print("mouse_offset_compensation", offset_mouse)
+        debug_log("mouse_offset_compensation", offset_mouse)
         context.window.cursor_warp(int(offset_mouse.x), int(offset_mouse.y))

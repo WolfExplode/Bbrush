@@ -26,8 +26,11 @@ def sync_bbrush_sculpt_mode():
                 sculpt.start_bbrush(context, None)
         elif sculpt.brush_runtime is not None:
             sculpt.exit_bbrush(context, False)
-    except Exception:
-        pass
+    except Exception as e:
+        from .debug import debug_log
+        import traceback
+        debug_log("sync_bbrush_sculpt_mode failed:", repr(e))
+        debug_log(traceback.format_exc())
 
 
 def object_mode_sync_bbrush():
@@ -56,7 +59,6 @@ def bbrush_timer():
 
     if not is_bbruse_mode():
         sculpt.keymap.try_restore_keymap()
-        sculpt.view_property.try_restore_view_property()
         sculpt.update_brush_shelf.try_restore_brush_shelf()
 
     return pref.refresh_interval

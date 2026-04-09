@@ -4,6 +4,8 @@ import gpu
 import numpy as np
 from gpu_extras.batch import batch_for_shader
 
+from ..debug import debug_log
+
 # 区域内「非背景」深度像素占比 ≥ 此值（0–1）时判定为命中几何体。
 # Blender 5.1+ 栅格会写入深度缓冲，不宜再用单点 min 深度判断。
 DEPTH_CONTENT_RATIO_THRESHOLD = 0.08
@@ -20,12 +22,7 @@ def _depth_content_ratio(numpy_buffer, *, near_eps=1e-5, far_eps=1e-4):
 
 def _depth_buffer_indicates_model(numpy_buffer):
     cr = _depth_content_ratio(numpy_buffer)
-    try:
-        from . import get_pref
-        if getattr(get_pref(), "debug", False):
-            print("check depth_content_ratio", cr)
-    except Exception:
-        ...
+    debug_log("check depth_content_ratio", cr)
     return cr >= DEPTH_CONTENT_RATIO_THRESHOLD
 
 

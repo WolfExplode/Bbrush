@@ -1,6 +1,6 @@
 import bpy
 
-from ..debug import DEBUG_KEYMAP
+from ..debug import debug_log
 
 keys: list[tuple["bpy.types.KeyMap", "bpy.types.KeyMapItem"]] = []
 
@@ -38,7 +38,7 @@ class BrushKeymap:
         wm = bpy.context.window_manager
         kc = wm.keyconfigs.addon
         if not kc:
-            print("BBrush: keyconfig unavailable (batch mode?), no keybinding items registered")
+            debug_log("keyconfig unavailable (batch mode?), no keybinding items registered")
             return
 
         # Primary BBrush mouse handlers (core sculpting behavior).
@@ -50,8 +50,7 @@ class BrushKeymap:
         kmi = km.keymap_items.new("sculpt.bbrush_right_mouse", "RIGHTMOUSE", "PRESS", any=True)
         keys.append((km, kmi))
 
-        if DEBUG_KEYMAP:
-            print("BBrush: addon keymaps registered", len(keys))
+        debug_log("addon keymaps registered", len(keys))
 
 
 def try_restore_keymap():
@@ -62,5 +61,4 @@ def try_restore_keymap():
     from ..utils import is_bbruse_mode
     if not is_bbruse_mode():
         BrushKeymap.unregister_addon_keymaps()
-        if DEBUG_KEYMAP:
-            print("try_restore_keymap ok")
+        debug_log("try_restore_keymap ok")

@@ -8,6 +8,7 @@ from mathutils import Vector
 
 from .line_to_convex_shell import line_to_convex_shell
 from .. import __package__ as base_name
+from ..debug import debug_log
 
 DISPLAY_ITEMS = (
     ("ALWAYS_DISPLAY", "Always display",
@@ -117,7 +118,7 @@ def get_brush_shape(brush) -> str:
             "builtin.lasso_trim",
     ):
         return "LASSO"
-    print("brush not match shape", brush)
+    debug_log("brush not match shape", brush)
     return "NONE"
 
 

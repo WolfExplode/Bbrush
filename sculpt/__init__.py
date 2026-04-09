@@ -2,7 +2,7 @@ import bpy
 from mathutils import Vector
 
 from . import brush
-from .keymap import BrushKeymap
+from .keymap import BbrushSyncBrushShelfModifiers, BrushKeymap
 from .left_mouse import LeftMouse
 from .right_mouse import RightMouse
 from .update_brush_shelf import UpdateBrushShelf
@@ -76,9 +76,9 @@ class FixBbrushError(bpy.types.Operator):
 
 class_list = [
     FixBbrushError,
+    BbrushSyncBrushShelfModifiers,
     LeftMouse,
     RightMouse,
-    UpdateBrushShelf,
 ]
 
 register_class, unregister_class = bpy.utils.register_classes_factory(class_list)

@@ -113,15 +113,10 @@ def set_brush_shelf(shelf_mode):
         tol._tools["SCULPT"] = shelf
 
 
-class UpdateBrushShelf(bpy.types.Operator):
-    bl_idname = "sculpt.bbursh_update_brush_shelf"
-    bl_label = "Update Brush Shelf"
+class UpdateBrushShelf:
+    """Brush shelf / tool-system switching. Not a wm.operator — only classmethods are used."""
 
-    def invoke(self, context, event):
-        self.update_brush_shelf(context, event)
-        return {"PASS_THROUGH", "FINISHED"}
-
-    # SCULPT,SMOOTH,HIDE,MASK,ORIGINAL
+    # SCULPT, SMOOTH, HIDE, MASK, ORIGINAL
     brush_shelf_mode = "NONE"
 
     @classmethod
@@ -137,7 +132,7 @@ class UpdateBrushShelf(bpy.types.Operator):
         mode = BRUSH_SHELF_MODE[key]  # 使用组合键来确认是否需要更新笔刷工具架
 
         ev = event
-        debug_log(cls.bl_idname, "\t", mode, "\t", getattr(ev, "type", None), getattr(ev, "value", None))
+        debug_log("UpdateBrushShelf", "\t", mode, "\t", getattr(ev, "type", None), getattr(ev, "value", None))
 
         (active_tool, work_space_tool, index) = get_active_tool(context)
 

@@ -14,17 +14,18 @@ DISPLAY_ITEMS = (
     ("ALWAYS_DISPLAY", "Always display",
      "Keep the silhouette displayed all the time, even when not in sculpting mode"),
     ("ONLY_SCULPT", "Only Sculpt", "Display silhouette images only in sculpting mode"),
-    ("ONLY_BBRUSH", "Only Bbrush", "Display silhouette images only in Bbrush mode"),
     ("NOT_DISPLAY", "Not Display", "Never display silhouette images at any time"),
 )
 
 
 def check_display_mode_is_draw(context, display_mode: str) -> bool:
+    # Legacy saved prefs may still have ONLY_BBRUSH (removed; same as only sculpt now).
+    if display_mode == "ONLY_BBRUSH":
+        display_mode = "ONLY_SCULPT"
     is_sculpt = context.mode == "SCULPT"
     always = display_mode == "ALWAYS_DISPLAY"
     only_sculpt = (display_mode == "ONLY_SCULPT") and is_sculpt
-    only_bbrush = (display_mode == "ONLY_BBRUSH") and is_sculpt and is_bbruse_mode()
-    return always or only_sculpt or only_bbrush
+    return always or only_sculpt
 
 
 def get_pref():

@@ -2,7 +2,7 @@ import bpy
 from bpy.app.handlers import persistent
 
 from . import depth_map, preferences, topbar, sculpt, src
-from .utils import register_submodule_factory, get_pref, is_bbruse_mode
+from .utils import register_submodule_factory, get_pref, is_bbrush_mode
 
 model_tuple = (
     src,
@@ -57,7 +57,7 @@ def load_post(_args):
 def bbrush_timer():
     pref = get_pref()
 
-    if not is_bbruse_mode():
+    if not is_bbrush_mode():
         sculpt.keymap.try_restore_keymap()
         sculpt.update_brush_shelf.try_restore_brush_shelf()
 

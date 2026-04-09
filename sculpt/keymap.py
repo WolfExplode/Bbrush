@@ -58,7 +58,7 @@ def try_restore_keymap():
     快捷键任未复位
     尝试修复"""
     context = bpy.context
-    from ..utils import is_bbruse_mode
-    if not is_bbruse_mode():
+    from ..utils import is_bbrush_mode
+    if not is_bbrush_mode():
         BrushKeymap.unregister_addon_keymaps()
         debug_log("try_restore_keymap ok")

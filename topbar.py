@@ -43,7 +43,6 @@ def top_bar_draw(self, context):
             row.prop(pref, "always_use_bbrush_sculpt_mode", emboss=True, icon="AUTO", text="")
 
             row = layout.row(align=True)
-            row.prop(pref, "show_shortcut_keys", emboss=True, icon="EVENT_K", text="")
             FixBbrushError.draw_button(row)
             text = "Silhouette Mode" if pref.top_bar_show_text else ""
             row.prop(pref, "depth_display_mode", emboss=True, text=text)

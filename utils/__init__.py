@@ -220,16 +220,6 @@ def check_mouse_in_depth_map_area(event) -> bool:
     return ("area_points" in depth_buffer_check) and mouse_in_area_point_in(event, depth_buffer_check["area_points"])
 
 
-def check_mouse_in_shortcut_key_area(event) -> bool:
-    """检查鼠标是否在快捷键上"""
-    from ..sculpt import brush_runtime
-    return (
-            brush_runtime and
-            brush_runtime.shortcut_key_points and
-            mouse_in_area_point_in(event, brush_runtime.shortcut_key_points)
-    )
-
-
 def check_modal_operators(bl_idname: str) -> bool:
     """检查操作符模态是否在运行"""
     for modal in bpy.context.window.modal_operators:
@@ -300,20 +290,6 @@ def get_property_rna_info(bl_rna, property_name: "str") -> "dict|None":
         # print("get_property_rna_info", property_name, data)
         return data
     return None
-
-
-@cache
-def get_view_navigation_texture(h, w):
-    from ..src import view_navigation
-    key = (h, w)
-    if len(view_navigation.texture_cache) == 40 and key in view_navigation.texture_cache:
-        return view_navigation.texture_cache[key]
-    else:
-        folder = os.path.dirname(os.path.dirname(__file__))
-        default_file_path = os.path.join(folder, "src", "view_navigation", "Default.png")
-        view_navigation.load_view_navigation_image(default_file_path)
-        # print(view_navigation.texture_cache.keys())
-        return view_navigation.texture_cache[key]
 
 
 def object_ray_cast(obj, context, mouse):

@@ -41,15 +41,6 @@ class BrushKeymap:
             print("BBrush: keyconfig unavailable (batch mode?), no keybinding items registered")
             return
 
-        try:
-            from ..utils import get_pref
-            pref = get_pref()
-        except Exception:
-            pref = None
-
-        def enabled(attr: str, default=True) -> bool:
-            return default if pref is None else bool(getattr(pref, attr, default))
-
         # Primary BBrush mouse handlers (core sculpting behavior).
         km = kc.keymaps.new(name="Sculpt", space_type="EMPTY", region_type="WINDOW")
 
@@ -58,16 +49,6 @@ class BrushKeymap:
 
         kmi = km.keymap_items.new("sculpt.bbrush_right_mouse", "RIGHTMOUSE", "PRESS", any=True)
         keys.append((km, kmi))
-
-        # Optional navigation bindings (overlay) - these affect Blender's view navigation directly.
-        if enabled("keymap_enable_alt_mmb_view_axis", True):
-            # Match HardOps: don't over-specify region_type here.
-            km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
-            # Blender keymaps vary by preset/version; register both PRESS and CLICK_DRAG to be safe.
-            kmi = km.keymap_items.new("view3d.view_axis", "MIDDLEMOUSE", "PRESS", alt=True)
-            keys.append((km, kmi))
-            kmi = km.keymap_items.new("view3d.view_axis", "MIDDLEMOUSE", "CLICK_DRAG", alt=True)
-            keys.append((km, kmi))
 
         if DEBUG_KEYMAP:
             print("BBrush: addon keymaps registered", len(keys))

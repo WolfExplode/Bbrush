@@ -5,7 +5,6 @@ from . import brush
 from .keymap import BrushKeymap
 from .left_mouse import LeftMouse
 from .right_mouse import RightMouse
-from .shortcut_key import ShortcutKey
 from .update_brush_shelf import UpdateBrushShelf
 from .view_property import ViewProperty
 from ..debug import DEBUG_MODE_TOGGLE
@@ -25,8 +24,6 @@ brush_runtime: "BrushRuntime|None" = None
 
 class BrushRuntime:
     left_mouse = Vector((0, 0))  # 偏移䃼尝用
-
-    shortcut_key_points = []  # 快捷键绘制区域判断用
 
     # SCULPT,SMOOTH,HIDE,MASK,ORIGINAL
     brush_mode = "NONE"
@@ -62,7 +59,6 @@ class BbrushStart(bpy.types.Operator):
         UpdateBrushShelf.update_brush_shelf(context, event)
 
         BrushKeymap.start_key(context)
-        ShortcutKey.start_shortcut_key()
         ViewProperty.start_view_property(context)
         refresh_ui(context)
 
@@ -95,7 +91,6 @@ class BbrushExit(bpy.types.Operator):
         if DEBUG_MODE_TOGGLE:
             print("exit bbrush")
 
-        ShortcutKey.stop_shortcut_key()
         BrushKeymap.restore_key(context)
         UpdateBrushShelf.restore_brush_shelf()
         ViewProperty.restore_view_property(context, un_reg)
@@ -122,21 +117,6 @@ class FixBbrushError(bpy.types.Operator):
 def refresh_depth_map():
     from ..depth_map.gpu_buffer import clear_gpu_cache
     clear_gpu_cache()
-
-
-def view3d_event(event):
-    """视图操作"""
-    pref = get_pref()
-    if event.alt:
-        # Alt-based navigation (pan) is gated behind the Alt+MMB setting.
-        if getattr(pref, "keymap_enable_alt_mmb_view_axis", True):
-            bpy.ops.view3d.move("INVOKE_DEFAULT")  # 平移视图
-    elif event.ctrl:
-        if getattr(pref, "keymap_enable_ctrl_rmb_drag_zoom", True):
-            bpy.ops.view3d.zoom("INVOKE_DEFAULT")  # 缩放视图
-    else:
-        if getattr(pref, "keymap_enable_rmb_drag_rotate", True):
-            bpy.ops.view3d.rotate("INVOKE_DEFAULT")  # 旋转视图
 
 
 class_list = [

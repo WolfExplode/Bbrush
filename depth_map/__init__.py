@@ -29,20 +29,6 @@ def draw_depth():
     global depth_buffer_check
     context = bpy.context
 
-    try:
-        from ..sculpt import brush_runtime
-        from ..sculpt.shortcut_key import ShortcutKey
-        if is_bbruse_mode():
-            ShortcutKey.draw_shortcut_key()
-    except ReferenceError as e:
-        from ..sculpt import BbrushExit
-        BbrushExit.exit(context)
-
-        import traceback
-        traceback.print_exc()
-        traceback.print_stack()
-        print(e.args)
-
     if check_depth_map_is_draw(context):
         filling_data(context)
 

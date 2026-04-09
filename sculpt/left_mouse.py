@@ -2,10 +2,10 @@ import bpy
 from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
 from mathutils import Vector
 
-from .brush import BrushShortcutKeyScale, BrushShape
+from .brush import BrushShape
 from ..debug import DEBUG_LEFT_MOUSE
 from ..utils import object_ray_cast, check_mouse_in_model, is_bbruse_mode, get_pref, check_modal_operators, \
-    check_mouse_in_depth_map_area, check_mouse_in_shortcut_key_area
+    check_mouse_in_depth_map_area
 from ..utils.manually_manage_events import ManuallyManageEvents
 
 
@@ -37,9 +37,6 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
 
         if check_mouse_in_depth_map_area(event):  # 缩放深度图
             bpy.ops.sculpt.bbrush_depth_scale("INVOKE_DEFAULT")
-            return {"FINISHED"}
-        elif check_mouse_in_shortcut_key_area(event) and BrushShortcutKeyScale.poll(context):  # 缩放快捷键
-            bpy.ops.sculpt.bbrush_shortcut_key_scale("INVOKE_DEFAULT")
             return {"FINISHED"}
 
         elif active_tool and active_tool.idname == "builtin_brush.draw_face_sets":
@@ -139,22 +136,14 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
             elif is_in_modal:  # and is_in_active_modal #
                 return self.brush_stroke(context, event)
             else:  # 鼠标不在模型上
-                pref = get_pref()
                 if only_shift:
-                    if getattr(pref, "keymap_enable_shift_lmb_drag_skew", True):
-                        bpy.ops.view3d.view_roll("INVOKE_DEFAULT", type="ANGLE")  # 倾斜视图
-                    else:
-                        # Disabled: do nothing and exit early (avoid doing work on empty-space drag).
-                        return {"FINISHED"}
+                    # Removed feature: Shift+LMB drag in empty space skew/roll view.
+                    return {"FINISHED"}
                 elif event.ctrl:  # 使用ctrl 或 ctrl shift 的笔刷
                     bpy.ops.sculpt.bbrush_shape("INVOKE_DEFAULT")
                 else:
-                    if getattr(pref, "keymap_enable_lmb_drag_rotate_empty", True):
-                        from . import view3d_event
-                        view3d_event(event)
-                    else:
-                        # Disabled: do nothing and exit early (avoid doing work on empty-space drag).
-                        return {"FINISHED"}
+                    # Removed feature: LMB drag in empty space rotates view.
+                    return {"FINISHED"}
             return {"FINISHED"}
         return {"RUNNING_MODAL"}
 

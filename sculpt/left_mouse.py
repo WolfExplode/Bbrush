@@ -3,6 +3,7 @@ from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
 from mathutils import Vector
 
 from .brush import BrushShape
+from ..adapter import sculpt_face_set_ctrl_shift_click_invoke
 from ..debug import debug_log
 from ..utils import object_ray_cast, check_mouse_in_model, get_pref, check_modal_operators, \
     check_mouse_in_depth_map_area
@@ -40,6 +41,10 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
             return {"FINISHED"}
 
         elif active_tool and active_tool.idname == "builtin_brush.draw_face_sets":
+            if event.shift and event.ctrl and not event.alt:
+                self.start_manually_manage_events(event)
+                context.window_manager.modal_handler_add(self)
+                return {"RUNNING_MODAL"}
             return self.brush_stroke(context, event)
         elif active_tool and "face_set" in active_tool.idname:
             """
@@ -95,6 +100,16 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
 
         if is_release:  # 单击
             debug_log("is_release", is_in_modal)
+            # ZBrush-style: isolate when fully visible; else hide face set under cursor (H).
+            if (
+                event.shift
+                and event.ctrl
+                and not event.alt
+                and is_in_modal
+                and not self.check_is_moving(event)
+            ):
+                sculpt_face_set_ctrl_shift_click_invoke(context)
+                return {"FINISHED"}
             if is_in_modal:  # 点在了其它模型上and not is_in_active_modal
                 try:
                     res = bpy.ops.object.transfer_mode("INVOKE_DEFAULT")  # object.transfer_mode 使用的c端gpu buffer检测

@@ -568,6 +568,9 @@ class BrushShape(bpy.types.Operator, ShapeUpdate):
             self.exit(context, event)
             return {'CANCELLED'}
         elif self.shape == "POLYLINE":
+            if is_press and event.type in ("RET", "NUMPAD_ENTER"):
+                self.exit(context, event)
+                return self.execute(context)
 
             if self.move_event(context, event):
                 refresh_ui(context)

@@ -2,99 +2,95 @@
 
 "No More Compromises—Built for Tablet Artists"
 
-This is an addon for Blender that simulates the way ZBrush sculpts.
-
-Also can display silhouette, much convenient for tablets.
-
+Blender add-on that reshapes sculpt workflow toward a ZBrush-style tool shelf and shortcuts: mask/hide tools swap in when you hold modifiers, plus a small silhouette overlay for tablet work.
 
 ![981b5107_9588511](https://github.com/user-attachments/assets/f02b0b50-e4ad-4e7b-9817-fec10ade2e6a)
 
-
 ![screenshot-20250516-154529](https://github.com/user-attachments/assets/cd966ef1-4884-42ee-949d-745725566a3f)
 
+## Getting started
 
+1. Enable the **Bbrush** add-on in Blender preferences.
+2. Select a mesh and enter **Sculpt** mode. The add-on swaps the sculpt tool shelf for Bbrush’s grouped layout while you are in sculpt mode (and restores Blender’s default list when you leave).
+3. Optional: use the **Silhouette** control in the 3D View header (sculpt mode) or open add-on preferences for the same setting.
 
+Display shortcut overlays if you use them; Bbrush does not replace Blender’s keymap for general navigation.
 
-## Start
+## Tool shelf and modifier keys
 
-1. Select a mesh object to enter sculpt mode
+While the cursor is over the 3D View, **Ctrl / Shift / Alt** combinations decide which tool list is active:
 
-2. Enter BBrush Sculpting mode（It can be automatically turned on with the sculpt mode in the preference settings）
+| Modifiers | Shelf |
+|-----------|--------|
+| No **Ctrl** | Sculpt brushes (default) |
+| **Ctrl** held (with or without **Alt**) | Mask tools |
+| **Ctrl+Shift** held (with or without **Alt**) | Hide / trim / project tools |
 
-![image](https://github.com/user-attachments/assets/9ae969f5-ca73-44f2-afff-8f63cf16d3df)
+The shelf updates on modifier **press** and **release** so you do not need to click the toolbar each time.
 
-3.Display shortcut keys
-![image](https://github.com/user-attachments/assets/50ed0789-c865-4fad-a463-a6956534d0eb)
+## Face sets (polygroups)
 
+Blender’s **Face Sets** map to a ZBrush-like mental model here.
 
-## Features
+### Shift + Ctrl + click (on the mesh)
 
-### Silhouette
+On **mouse / pen release**, with **Shift** and **Ctrl** held (no **Alt**), **without** dragging: Bbrush runs face-set visibility logic:
 
-When enable the silhouette, you can modify it in preferences or at the tool settings.
+- If the mesh is **fully visible** (no hidden geometry): **isolate** the face set under the cursor (same idea as Blender’s face-set isolate / Shift+H style toggle).
+- If you already have **partial hide**: **hide** the face set under the cursor as well (stacking hides, similar to pressing **H** on that set).
 
-#### Display mode
+The click must start **on the sculpt mesh** (same hit-test used elsewhere in Bbrush).
 
-- **Always**: Keep silhouette on toop even not in sculpt mode
-- **Only Sculpt**: Display in sculpt mode
-- **Only Bbrush**: Display in Bbrush mode
-- **Disable**: Don't display
+### Ctrl + W
 
-#### Scale
+**Ctrl+W** runs **Face Set from Mask or Visible** (`sculpt.bbrush_face_sets_create_zbrush`):
 
-![c275d79d_9588511](https://github.com/user-attachments/assets/3485e5d1-ce2f-4214-9483-db4c2d65b9aa)
+- If there is a **non-zero sculpt mask**: create a face set from **masked** faces, then **clear the mask** (so a second **Ctrl+W** can run the visible path).
+- If there is **no mask**: create a face set from **currently visible** geometry (useful after hiding parts of the mesh).
 
+**Shift** and **Alt** must be off for this keymap item (see `sculpt/keymap.py`).
 
-### Bbrush mode
+## Left mouse (sculpt)
 
-When enter sculpt mode, top bar will have a Bbrush mode button.
-Bbrush mode has many shorcuts:
-#### Normal Mode.
-Shows frequently used brushes
+Bbrush installs **`sculpt.bbrush_left_mouse`** on **left button press** in sculpt mode.
 
-    View Manipulation
-        Panning ALT+Right or ALT+Center
-        Panning ALT+Left Drag on blank space
-        Panning view SHIFT+Middle key
-        Rotate view Right click
-        Rotate view Left-click Drag in blank area
-        Zoom View CTRL+Middle or CTRL+Right
-        Skew View SHIFT+Left Drag in empty space
-    Sculpting
-        Sculpt Left click Draw on the model
-        Reverse Sculpt ALT+Left click Draw on model
-        Smooth SHIFT+Left click Draw on model
-    Other
-        Toggle engraved objects ALT+Left click on other models
+- **Drag on the mesh** (normal shelf): forwards to Blender’s sculpt stroke (invert with **Alt**, smooth with **Shift** per Blender’s stroke rules).
+- **Drag** with a **line / box / lasso / polyline / circular / ellipse** mask or hide tool: starts the matching gesture (or **`sculpt.bbrush_shape`** for the tools Bbrush wraps).
+- **Ctrl + drag** starting in **empty space**: starts **`sculpt.bbrush_shape`** for mask/hide box-style workflows when no stroke target is needed.
+- **Single click** (no drag): **`sculpt.bbrush_click`**  
+  - **Mask shelf**: on mesh — smooth mask; **Ctrl+Alt** on mesh — sharpen mask; off mesh — invert mask.  
+  - **Hide shelf**: on mesh — invert visibility; off mesh — show all hidden.
 
-#### Mask mode (Ctrl or Ctrl Alt).
-When in mask mode, the brush will be switched to a mask brush.
+**Polyline** mask/hide (and other shapes handled by `bbrush_shape`): add points with **left click**; **right click** removes the last point (or cancels if only one); **Esc** cancels; **Enter** or **numpad Enter** **commits**; **double-click** the last vertex also commits. **Space**: move the whole polyline while drawing.
 
-![screenshot-20250516-134302](https://github.com/user-attachments/assets/393043a5-64d0-47e0-a5f8-8ed8d15463e0)
+Tools that remain **fully on Blender** (face set paint, annotate, transform, filters, etc.) use **`PASS_THROUGH`** so default Blender behavior is unchanged.
 
-    Draw Mask CTRL+Left click to draw on the model.
-    Erase Mask CTRL+ALT+Left to draw on the model.
-    Invert Mask CTRL+Left Click on blank area
-    Frame Mask CTRL+Left click Drag from blank area to model
-    Box Erase Mask CTRL+ALT+left click Drag from blank area to model
-    Fade Mask CTRL+left click on model
-    Clear Mask CTRL+Left click Draw box on blank area
-    Sharpen Mask CTRL+ALT+left click on model
-    Fill Mask CTRL+ALT+Left Click to draw a box in a blank area.
-    Growth Mask CTRL+Keypad+Sign Click
-    Shrink Mask CTRL+Keypad - Sign Click
-    Increase Mask Contrast CTRL+Up Arrow or CTRL+Keypad* Click
-    Decrease Mask Contrast CTRL+Down Arrow or CTRL+Keypad/ Click
+## Right mouse
 
-#### Hidden Mode.
-Brushes will switch to hidden mode.
+**`sculpt.bbrush_right_mouse`**: **release** opens the sculpt **context menu**. **Drag** is passed through to Blender (rotation / zoom on RMB are **not** implemented by Bbrush).
 
-    Hide Outside Paint Box CTRL+SHIFT+Left click Paint on Model
-    Inside the hidden drawing box CTRL+SHIFT+ALT+Left click Draw on the model.
-    Unhide CTRL+SHIFT+Left click in blank area (will not work if you add multi-level subdivision modifier, this is Bl's own problem)
-    Reverse hide CTRL+SHIFT+Left click or CTRL+SHIFT+ALT+Left click Draw on the blank area.
+## Silhouette (depth preview)
 
-## Notice
+In **Add-on preferences → Silhouette** (and the 3D View header enum in sculpt mode):
 
-- Switch hidden faces will cause multiresolution disabled
-- Blender 3.0 + smooth brushes + invert sculpt = crash
+- **Always display** — overlay even outside sculpt mode  
+- **Only Sculpt** — overlay only in sculpt mode  
+- **Not Display** — off  
+
+Adjust **scale** and **offset** there. A small depth strip near the cursor can be used for depth brushing (see preferences for **Depth ray** and related options).
+
+## Preferences and troubleshooting
+
+- **Depth ray check size** — pixel radius used to decide if the pointer is “on” the mesh.  
+- **Drag offset compensation** — optional stroke cursor compensation.  
+- **Debug** — log to the system console; **Print State** / **System Console** operators for support.  
+- **Reset BBrush Keymap & Tool Shelf** (`sculpt.bbrush_fix`) — if shortcuts or the shelf misbehave after reload or file load.
+
+## Requirements
+
+- Blender **4.0+** (see `bl_info` in `__init__.py` for the exact minimum).
+
+## Notices
+
+- Hiding faces can interact badly with **Multires**; that limitation comes from Blender’s visibility pipeline, not only from this add-on.
+- Older Blender + certain smooth/invert stroke combinations had stability issues; use a supported Blender version.

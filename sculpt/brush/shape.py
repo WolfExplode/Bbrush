@@ -358,7 +358,10 @@ class DragBase(DragDraw):
                     if self.is_reverse:
                         bpy.ops.paint.hide_show('EXEC_DEFAULT', True, action='HIDE', area="Inside", **box_args)
                     else:
-                        bpy.ops.paint.hide_show('EXEC_DEFAULT', True, action='HIDE', area='OUTSIDE', **box_args)
+                        # Dumb symmetry hack: OUTSIDE + symmetry behaves like AND of mirrored frustums;
+                        # Alt path uses Inside. Fake Alt then invert visibility to approximate normal OUTSIDE.
+                        bpy.ops.paint.hide_show('EXEC_DEFAULT', True, action='HIDE', area="Inside", **box_args)
+                        sculpt_invert_hide_face()
                 else:
                     sculpt_invert_hide_face()
         elif self.shape in ("LASSO", "POLYLINE", "CIRCULAR", "ELLIPSE"):

@@ -24,8 +24,7 @@ class BbrushSyncBrushShelfModifiers(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        from ..utils import is_bbrush_mode
-        return context.mode == "SCULPT" and is_bbrush_mode()
+        return context.mode == "SCULPT"
 
     def invoke(self, context, event):
         from .update_brush_shelf import UpdateBrushShelf
@@ -52,7 +51,7 @@ class BrushKeymap:
             try:
                 km.keymap_items.remove(kmi)
             except Exception:
-                ...
+                pass
         keys.clear()
 
     @staticmethod
@@ -93,14 +92,3 @@ class BrushKeymap:
                 keys.append((km, kmi))
 
         debug_log("addon keymaps registered", len(keys))
-
-
-def try_restore_keymap():
-    """在不是Bbrush模式时
-    快捷键任未复位
-    尝试修复"""
-    context = bpy.context
-    from ..utils import is_bbrush_mode
-    if not is_bbrush_mode():
-        BrushKeymap.unregister_addon_keymaps()
-        debug_log("try_restore_keymap ok")

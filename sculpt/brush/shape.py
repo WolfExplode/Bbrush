@@ -17,7 +17,6 @@ from ...utils import (
     get_active_tool,
     refresh_ui,
     line_to_convex_shell,
-    is_bbrush_mode,
 )
 from ...utils.gpu import draw_text, draw_line, draw_smooth_line
 
@@ -469,7 +468,7 @@ class BrushShape(bpy.types.Operator, ShapeUpdate):
 
     @classmethod
     def poll(cls, context):
-        return is_bbrush_mode()
+        return context.mode == "SCULPT"
 
     def start_modal(self, context, event):
         global drag_runtime

@@ -2,7 +2,7 @@ import bpy
 from bpy.app.handlers import persistent
 
 from . import depth_map, preferences, topbar, sculpt, src
-from .utils import register_submodule_factory, get_pref, is_bbrush_mode
+from .utils import register_submodule_factory
 
 model_tuple = (
     src,
@@ -17,24 +17,23 @@ register_module, unregister_module = register_submodule_factory(model_tuple)
 owner = object()
 
 
-def sync_bbrush_sculpt_mode():
-    """Bbrush is active whenever Blender is in sculpt mode."""
+def sync_sculpt_tool_shelf():
+    """Swap Bbrush sculpt shelf in/out when entering or leaving sculpt mode."""
     context = bpy.context
     try:
         if context.mode == "SCULPT":
-            if sculpt.brush_runtime is None:
-                sculpt.start_bbrush(context, None)
-        elif sculpt.brush_runtime is not None:
-            sculpt.exit_bbrush(context, False)
+            sculpt.activate_sculpt_brush_shelf(context, None)
+        else:
+            sculpt.deactivate_sculpt_brush_shelf(context)
     except Exception as e:
         from .debug import debug_log
         import traceback
-        debug_log("sync_bbrush_sculpt_mode failed:", repr(e))
+        debug_log("sync_sculpt_tool_shelf failed:", repr(e))
         debug_log(traceback.format_exc())
 
 
-def object_mode_sync_bbrush():
-    sync_bbrush_sculpt_mode()
+def object_mode_sync_sculpt_shelf():
+    sync_sculpt_tool_shelf()
 
 
 def load_subscribe():
@@ -42,7 +41,7 @@ def load_subscribe():
         key=(bpy.types.Object, "mode"),
         owner=owner,
         args=(),
-        notify=object_mode_sync_bbrush,
+        notify=object_mode_sync_sculpt_shelf,
         options={"PERSISTENT"},
     )
 
@@ -51,37 +50,32 @@ def load_subscribe():
 def load_post(_args):
     bpy.msgbus.clear_by_owner(owner)
     load_subscribe()
-    sync_bbrush_sculpt_mode()
-
-
-def bbrush_timer():
-    pref = get_pref()
-
-    if not is_bbrush_mode():
-        sculpt.keymap.try_restore_keymap()
-        sculpt.update_brush_shelf.try_restore_brush_shelf()
-
-    return pref.refresh_interval
+    # Global brush_shelf survives file load; clear so ORIGINAL matches this .blend.
+    sculpt.deactivate_sculpt_brush_shelf(bpy.context)
+    sync_sculpt_tool_shelf()
 
 
 def register():
     register_module()
 
+    sculpt.BrushKeymap.start_key(bpy.context)
+
     load_subscribe()
     bpy.app.handlers.load_post.append(load_post)
 
-    bpy.app.timers.register(bbrush_timer, first_interval=1, persistent=True)
-    sync_bbrush_sculpt_mode()
+    sync_sculpt_tool_shelf()
 
 
 def unregister():
-    sculpt.exit_bbrush(bpy.context, True)
+    try:
+        sculpt.unregister_addon_runtime(bpy.context)
+    except Exception as e:
+        import traceback
+        print("BBrush: unregister_addon_runtime during unregister failed:", repr(e))
+        traceback.print_exc()
 
     bpy.msgbus.clear_by_owner(owner)
     if load_post in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(load_post)
-
-    if bpy.app.timers.is_registered(bbrush_timer):
-        bpy.app.timers.unregister(bbrush_timer)
 
     unregister_module()

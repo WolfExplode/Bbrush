@@ -90,5 +90,8 @@ def register():
 def unregister():
     global handel
     if handel:
-        bpy.types.SpaceView3D.draw_handler_remove(handel, "WINDOW")
+        try:
+            bpy.types.SpaceView3D.draw_handler_remove(handel, "WINDOW")
+        except Exception as e:
+            debug_log("draw_handler_remove failed:", repr(e))
         handel = None

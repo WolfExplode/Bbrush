@@ -226,12 +226,6 @@ def check_modal_operators(bl_idname: str) -> bool:
     return False
 
 
-def is_bbrush_mode() -> bool:
-    """检查是否在 Bbrush 模式（雕刻中插件运行时）。"""
-    from ..sculpt import brush_runtime
-    return brush_runtime is not None
-
-
 def refresh_ui(context):
     """刷新UI
     # bpy.ops.wm.redraw_timer(type='DRAW', iterations=1)

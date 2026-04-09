@@ -5,7 +5,7 @@ from . import brush
 from .keymap import BbrushSyncBrushShelfModifiers, BrushKeymap
 from .left_mouse import LeftMouse
 from .right_mouse import RightMouse
-from .update_brush_shelf import UpdateBrushShelf
+from .update_brush_shelf import UpdateBrushShelf, brush_shelf
 from ..debug import debug_log
 from ..utils import refresh_ui
 
@@ -19,41 +19,32 @@ class BrushRuntime:
     brush_mode = "NONE"
 
 
-def start_bbrush(context, event=None):
-    """Activate Bbrush while in sculpt mode (no operator)."""
-    global brush_runtime
-
-    debug_log("start_bbrush")
-
-    if brush_runtime is not None:
-        return
-
-    brush_runtime = BrushRuntime()
-
-    UpdateBrushShelf.start_brush_shelf(context)
-    # Historically update_brush_shelf was called twice in a row here. Removed duplicate;
-    # if tool shelf / active tool ever mis-sync on Bbrush start, revisit—may have been
-    # compensating for Blender tool-system timing or a one-frame stale state.
+def activate_sculpt_brush_shelf(context, event=None):
+    """Build / refresh Bbrush tool shelf while in sculpt mode."""
+    if "ORIGINAL" not in brush_shelf:
+        UpdateBrushShelf.start_brush_shelf(context)
     UpdateBrushShelf.update_brush_shelf(context, event)
-
-    BrushKeymap.start_key(context)
     refresh_ui(context)
 
 
-def exit_bbrush(context, un_reg=False):
-    """Tear down Bbrush runtime (leaving sculpt mode or disabling addon)."""
-    global brush_runtime
+def deactivate_sculpt_brush_shelf(context):
+    """Restore Blender's default sculpt tool shelf when leaving sculpt mode."""
+    if "ORIGINAL" in brush_shelf:
+        UpdateBrushShelf.restore_brush_shelf()
+    refresh_ui(context)
 
-    if brush_runtime is None:
-        return
 
-    debug_log("exit_bbrush", un_reg)
-
-    brush_runtime = None
-
-    BrushKeymap.restore_key(context)
-    UpdateBrushShelf.restore_brush_shelf()
-
+def unregister_addon_runtime(context):
+    """Full teardown when the add-on is disabled (keymaps + shelf)."""
+    debug_log("unregister_addon_runtime")
+    try:
+        BrushKeymap.restore_key(context)
+    except Exception as e:
+        debug_log("unregister_addon_runtime: restore_key failed:", repr(e))
+    try:
+        UpdateBrushShelf.restore_brush_shelf()
+    except Exception as e:
+        debug_log("unregister_addon_runtime: restore_brush_shelf failed:", repr(e))
     refresh_ui(context)
 
 
@@ -64,9 +55,13 @@ class FixBbrushError(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     def execute(self, context):
-        exit_bbrush(context)
+        BrushKeymap.unregister_addon_keymaps()
+        BrushKeymap.register_addon_keymaps(context)
+        if "ORIGINAL" in brush_shelf:
+            UpdateBrushShelf.restore_brush_shelf()
         if context.mode == "SCULPT":
-            start_bbrush(context, None)
+            activate_sculpt_brush_shelf(context, None)
+        refresh_ui(context)
         return {"FINISHED"}
 
     @classmethod
@@ -85,6 +80,8 @@ register_class, unregister_class = bpy.utils.register_classes_factory(class_list
 
 
 def register():
+    global brush_runtime
+    brush_runtime = BrushRuntime()
     brush.register()
     register_class()
 

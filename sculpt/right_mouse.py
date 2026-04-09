@@ -10,6 +10,10 @@ class RightMouse(bpy.types.Operator, ManuallyManageEvents):
     bl_label = "Sculpt"
     bl_description = "RightMouse"
 
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "SCULPT"
+
     def invoke(self, context, event):
 
         from . import UpdateBrushShelf

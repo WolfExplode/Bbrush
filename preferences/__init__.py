@@ -81,16 +81,11 @@ class Preferences(
         max=2
     )
 
-    refresh_fps: bpy.props.IntProperty(name="Refresh FPS", default=1, min=1, max=120)
     debug: bpy.props.BoolProperty(
         name="Debug logging",
         description="Print Bbrush diagnostic messages to the system console",
         default=False,
     )
-
-    @property
-    def refresh_interval(self):
-        return 1 / self.refresh_fps
 
     def draw(self, context):
         from ..sculpt import FixBbrushError
@@ -102,7 +97,6 @@ class Preferences(
 
         box = col.box()
         box.label(text="Sculpt")
-        box.prop(self, "refresh_fps")
         box.prop(self, "depth_ray_size")
 
         box.prop(self, "enabled_drag_offset_compensation")

@@ -1,7 +1,7 @@
 import bpy
 
 from ...debug import debug_log
-from ...utils import is_bbrush_mode, check_mouse_in_model
+from ...utils import check_mouse_in_model
 
 
 class BrushClick(bpy.types.Operator):
@@ -11,7 +11,7 @@ class BrushClick(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return is_bbrush_mode()
+        return context.mode == "SCULPT"
 
     def invoke(self, context, event):
         from .. import brush_runtime

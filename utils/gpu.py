@@ -66,10 +66,14 @@ def get_mouse_location_ray_cast(context, x, y):
     view3d.shading.show_xray = False
     data = {}
     space = bpy.types.SpaceView3D
-    handler = space.draw_handler_add(gpu_depth_ray_cast, (x, y, data), 'WINDOW', 'POST_PIXEL')
-    bpy.ops.wm.redraw_timer(type='DRAW', iterations=1)
-    space.draw_handler_remove(handler, 'WINDOW')
-    view3d.shading.show_xray = show_xray
+    handler = None
+    try:
+        handler = space.draw_handler_add(gpu_depth_ray_cast, (x, y, data), 'WINDOW', 'POST_PIXEL')
+        bpy.ops.wm.redraw_timer(type='DRAW', iterations=1)
+    finally:
+        if handler is not None:
+            space.draw_handler_remove(handler, 'WINDOW')
+        view3d.shading.show_xray = show_xray
     return data.get('is_in_model', False)
 
 
@@ -87,10 +91,14 @@ def get_area_ray_cast(context, x, y, w, h):
     view3d = context.space_data
     show_xray = view3d.shading.show_xray
     view3d.shading.show_xray = False
-    handler = bpy.types.SpaceView3D.draw_handler_add(get_ray_cast, (), 'WINDOW', 'POST_PIXEL')
-    bpy.ops.wm.redraw_timer(type='DRAW', iterations=1)
-    bpy.types.SpaceView3D.draw_handler_remove(handler, 'WINDOW')
-    view3d.shading.show_xray = show_xray
+    handler = None
+    try:
+        handler = bpy.types.SpaceView3D.draw_handler_add(get_ray_cast, (), 'WINDOW', 'POST_PIXEL')
+        bpy.ops.wm.redraw_timer(type='DRAW', iterations=1)
+    finally:
+        if handler is not None:
+            bpy.types.SpaceView3D.draw_handler_remove(handler, 'WINDOW')
+        view3d.shading.show_xray = show_xray
     return data.get('is_in_model', False)
 
 

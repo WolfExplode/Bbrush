@@ -140,7 +140,6 @@ data = {
     "BBrush fix": "BBrush 修复",
     "Fix Bbrush error": "修复Bbrush错误",
     "Shortcut Key Move": "移动快捷键",
-    "Refresh FPS": "刷新FPS",
     "View navigation scale": "视图导览缩放",
     "View navigation offset": "视图导览偏移"
 }

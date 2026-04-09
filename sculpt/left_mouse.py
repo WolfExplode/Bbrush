@@ -4,7 +4,7 @@ from mathutils import Vector
 
 from .brush import BrushShape
 from ..debug import debug_log
-from ..utils import object_ray_cast, check_mouse_in_model, is_bbrush_mode, get_pref, check_modal_operators, \
+from ..utils import object_ray_cast, check_mouse_in_model, get_pref, check_modal_operators, \
     check_mouse_in_depth_map_area
 from ..utils.manually_manage_events import ManuallyManageEvents
 
@@ -17,7 +17,7 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
 
     @classmethod
     def poll(cls, context):
-        return is_bbrush_mode()
+        return context.mode == "SCULPT"
 
     def invoke(self, context, event):
         """由于5.0版本的拖动事件触发不灵敏,所以需要手动管理拖动及点击事件

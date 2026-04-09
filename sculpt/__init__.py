@@ -50,8 +50,13 @@ def unregister_addon_runtime(context):
 
 class FixBbrushError(bpy.types.Operator):
     bl_idname = "sculpt.bbrush_fix"
-    bl_label = "BBrush fix"
-    bl_description = "Fix Bbrush error"
+    bl_label = "Reset BBrush Keymap & Tool Shelf"
+    bl_description = (
+        "Re-register this add-on's keymaps (left/right mouse sculpt handlers and "
+        "Ctrl/Shift/Alt tool-shelf sync). Restore Blender's default sculpt tool list "
+        "if needed, then rebuild BBrush's shelf while in sculpt mode. "
+        "Use after odd behavior (e.g. file load or add-on reload), not for everyday sculpting."
+    )
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -62,11 +67,11 @@ class FixBbrushError(bpy.types.Operator):
         if context.mode == "SCULPT":
             activate_sculpt_brush_shelf(context, None)
         refresh_ui(context)
+        self.report(
+            {"INFO"},
+            "BBrush keymaps and sculpt tool shelf were reset.",
+        )
         return {"FINISHED"}
-
-    @classmethod
-    def draw_button(cls, layout):
-        layout.operator(cls.bl_idname, text="", icon="EVENT_F")
 
 
 class_list = [

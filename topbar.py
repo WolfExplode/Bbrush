@@ -7,14 +7,11 @@ def top_bar_draw(self, context):
     if context.mode != "SCULPT":
         return
 
-    from .sculpt import FixBbrushError
-
     pref = get_pref()
     layout = self.layout
 
     row = layout.row(align=True)
     row.separator(factor=2)
-    FixBbrushError.draw_button(row)
     row.prop(pref, "depth_display_mode", emboss=True, text="")
     row.separator(factor=5)
 

@@ -102,7 +102,11 @@ class Preferences(
         box.prop(self, "enabled_drag_offset_compensation")
         box.prop(self, "drag_offset_compensation")
 
-        sub_col = box.column()
+        sub_col = box.column(align=False)
+        sub_col.label(
+            text="If shortcuts or the sculpt tool shelf act wrong (after file load / add-on reload):",
+            icon="INFO",
+        )
         sub_col.operator(FixBbrushError.bl_idname)
 
         dbg = col.box()

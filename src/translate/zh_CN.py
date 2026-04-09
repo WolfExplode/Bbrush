@@ -139,6 +139,12 @@ data = {
     "Use view pref": "使用视图偏好设置",
     "BBrush fix": "BBrush 修复",
     "Fix Bbrush error": "修复Bbrush错误",
+    "Reset BBrush Keymap & Tool Shelf": "重置 BBrush 快捷键与工具架",
+    "Re-register this add-on's keymaps (left/right mouse sculpt handlers and Ctrl/Shift/Alt tool-shelf sync). Restore Blender's default sculpt tool list if needed, then rebuild BBrush's shelf while in sculpt mode. Use after odd behavior (e.g. file load or add-on reload), not for everyday sculpting.":
+        "重新注册本插件的快捷键（左右键雕刻与 Ctrl/Shift/Alt 工具架同步）。必要时恢复 Blender 默认雕刻工具列表，并在雕刻模式下重建 BBrush 工具架。仅在异常后使用（如打开文件或重载插件），日常雕刻无需点击。",
+    "BBrush keymaps and sculpt tool shelf were reset.": "已重置 BBrush 快捷键与雕刻工具架。",
+    "If shortcuts or the sculpt tool shelf act wrong (after file load / add-on reload):":
+        "若快捷键或雕刻工具架异常（打开文件或重载插件后）：",
     "Shortcut Key Move": "移动快捷键",
     "View navigation scale": "视图导览缩放",
     "View navigation offset": "视图导览偏移"

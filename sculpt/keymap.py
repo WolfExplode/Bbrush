@@ -15,6 +15,9 @@ _MODIFIER_SHELF_SYNC_KEYS = (
     "RIGHT_ALT",
 )
 
+# Must match what register_addon_keymaps adds (LMB/RMB + modifier PRESS/RELEASE pairs).
+_EXPECTED_BBRUSH_KEY_ITEM_COUNT = 2 + len(_MODIFIER_SHELF_SYNC_KEYS) * 2
+
 
 class BbrushSyncBrushShelfModifiers(bpy.types.Operator):
     bl_idname = "sculpt.bbrush_sync_brush_shelf_modifiers"
@@ -33,6 +36,46 @@ class BbrushSyncBrushShelfModifiers(bpy.types.Operator):
         return {"PASS_THROUGH"}
 
 
+_BBRUSH_KMI_IDNAMES = frozenset(
+    {
+        "sculpt.bbrush_left_mouse",
+        "sculpt.bbrush_right_mouse",
+        BbrushSyncBrushShelfModifiers.bl_idname,
+    }
+)
+
+
+def _purge_orphan_bbrush_addon_keyitems():
+    """Remove any BBrush keymap items still in the add-on keyconfig (stale refs, partial unregister)."""
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    if not kc:
+        return
+    for km in kc.keymaps:
+        for kmi in list(km.keymap_items):
+            if kmi.idname not in _BBRUSH_KMI_IDNAMES:
+                continue
+            try:
+                km.keymap_items.remove(kmi)
+            except Exception as e:
+                debug_log(
+                    "purge orphan bbrush keyitem failed:",
+                    repr(e),
+                    kmi.idname,
+                )
+
+
+def _clear_tracked_bbrush_keyitems():
+    global keys
+    for km, kmi in list(keys):
+        try:
+            km.keymap_items.remove(kmi)
+        except Exception as e:
+            debug_log("unregister_addon_keymaps: tracked remove failed:", repr(e))
+    keys.clear()
+    _purge_orphan_bbrush_addon_keyitems()
+
+
 class BrushKeymap:
     @classmethod
     def start_key(cls, context):
@@ -46,22 +89,23 @@ class BrushKeymap:
     @staticmethod
     def unregister_addon_keymaps():
         """Remove add-on overlay keymaps."""
-        global keys
-        for km, kmi in keys:
-            try:
-                km.keymap_items.remove(kmi)
-            except Exception:
-                pass
-        keys.clear()
+        _clear_tracked_bbrush_keyitems()
 
     @staticmethod
     def register_addon_keymaps(context=None):
         """Add keymap items into wm.keyconfigs.addon (does not touch user's preset)."""
         global keys
 
-        # Ensure idempotency: don't duplicate registrations.
         if keys:
-            return
+            if len(keys) == _EXPECTED_BBRUSH_KEY_ITEM_COUNT:
+                return
+            debug_log(
+                "register_addon_keymaps: stale key tracking, clearing before register",
+                len(keys),
+                "expected",
+                _EXPECTED_BBRUSH_KEY_ITEM_COUNT,
+            )
+            _clear_tracked_bbrush_keyitems()
 
         wm = bpy.context.window_manager
         kc = wm.keyconfigs.addon

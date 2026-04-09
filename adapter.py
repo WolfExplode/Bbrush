@@ -16,6 +16,86 @@ def sculpt_mesh_has_hidden_geometry(context) -> bool:
     return any(v.hide for v in mesh.vertices)
 
 
+def _attribute_has_nonzero_mask_values(attr, count: int) -> bool:
+    """True if any mask element is non-zero (FLOAT or BOOLEAN sculpt_mask)."""
+    if count <= 0:
+        return False
+    data_type = getattr(attr, "data_type", "FLOAT")
+
+    if data_type == "BOOLEAN":
+        try:
+            import numpy as np
+
+            buf = np.zeros(count, dtype=np.bool_)
+            attr.data.foreach_get("value", buf)
+            return bool(buf.any())
+        except Exception:
+            for i in range(count):
+                try:
+                    if bool(attr.data[i].value):
+                        return True
+                except (AttributeError, TypeError, ValueError, IndexError):
+                    continue
+            return False
+
+    try:
+        import numpy as np
+
+        buf = np.zeros(count, dtype=np.float32)
+        attr.data.foreach_get("value", buf)
+        if float(np.max(np.abs(buf))) > 1e-6:
+            return True
+    except Exception:
+        pass
+    for i in range(count):
+        try:
+            if abs(float(attr.data[i].value)) > 1e-6:
+                return True
+        except (AttributeError, TypeError, ValueError, IndexError):
+            continue
+    return False
+
+
+def sculpt_mesh_has_nonzero_mask(context) -> bool:
+    """True if sculpt_mask has any non-zero weight (anything masked)."""
+    obj = context.sculpt_object
+    if not obj or obj.type != "MESH":
+        return False
+    mesh = obj.data
+    if type(mesh).__name__ != "Mesh":
+        return False
+    try:
+        context.view_layer.update()
+    except Exception:
+        pass
+
+    # In Blender 5.1 the sculpt mask is stored as ".sculpt_mask" (leading dot = internal).
+    attr = mesh.attributes.get(".sculpt_mask") or mesh.attributes.get("sculpt_mask")
+    if attr is None:
+        return False
+    try:
+        n = len(attr.data)
+    except Exception:
+        n = len(mesh.vertices)
+    return _attribute_has_nonzero_mask_values(attr, n)
+
+
+def sculpt_face_sets_create_zbrush_ctrl_w(context) -> set:
+    """ZBrush Ctrl+W: if masked → Face Set from Masked, then clear mask; else Face Set from Visible."""
+    try:
+        if sculpt_mesh_has_nonzero_mask(context):
+            res = bpy.ops.sculpt.face_sets_create("EXEC_DEFAULT", True, mode="MASKED")
+            if res != {"FINISHED"}:
+                return res
+            # Second Ctrl+W should see no mask → VISIBLE path (ZBrush parity).
+            return bpy.ops.paint.mask_flood_fill(
+                "EXEC_DEFAULT", True, mode="VALUE", value=0.0
+            )
+        return bpy.ops.sculpt.face_sets_create("EXEC_DEFAULT", True, mode="VISIBLE")
+    except RuntimeError:
+        return {"CANCELLED"}
+
+
 def _face_set_change_visibility_invoke(context, mode: str) -> set:
     try:
         if context.area and context.region:

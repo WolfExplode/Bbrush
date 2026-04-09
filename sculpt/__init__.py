@@ -48,6 +48,26 @@ def unregister_addon_runtime(context):
     refresh_ui(context)
 
 
+class FaceSetsCreateZbrushCtrlW(bpy.types.Operator):
+    bl_idname = "sculpt.bbrush_face_sets_create_zbrush"
+    bl_label = "Face Set from Mask or Visible"
+    bl_description = (
+        "ZBrush Ctrl+W: if masked, Face Set from Masked then clear mask; "
+        "if not masked, Face Set from Visible (e.g. after partial hide)"
+    )
+    bl_options = {"REGISTER"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "SCULPT" and context.sculpt_object is not None
+
+    def execute(self, context):
+        from ..adapter import sculpt_face_sets_create_zbrush_ctrl_w
+
+        res = sculpt_face_sets_create_zbrush_ctrl_w(context)
+        return res if res == {"FINISHED"} else {"CANCELLED"}
+
+
 class FixBbrushError(bpy.types.Operator):
     bl_idname = "sculpt.bbrush_fix"
     bl_label = "Reset BBrush Keymap & Tool Shelf"
@@ -75,6 +95,7 @@ class FixBbrushError(bpy.types.Operator):
 
 
 class_list = [
+    FaceSetsCreateZbrushCtrlW,
     FixBbrushError,
     BbrushSyncBrushShelfModifiers,
     LeftMouse,

@@ -15,8 +15,8 @@ _MODIFIER_SHELF_SYNC_KEYS = (
     "RIGHT_ALT",
 )
 
-# Must match what register_addon_keymaps adds (LMB/RMB + modifier PRESS/RELEASE pairs).
-_EXPECTED_BBRUSH_KEY_ITEM_COUNT = 2 + len(_MODIFIER_SHELF_SYNC_KEYS) * 2
+# Must match what register_addon_keymaps adds (LMB/RMB + Ctrl+W + modifier PRESS/RELEASE pairs).
+_EXPECTED_BBRUSH_KEY_ITEM_COUNT = 3 + len(_MODIFIER_SHELF_SYNC_KEYS) * 2
 
 
 class BbrushSyncBrushShelfModifiers(bpy.types.Operator):
@@ -40,6 +40,7 @@ _BBRUSH_KMI_IDNAMES = frozenset(
     {
         "sculpt.bbrush_left_mouse",
         "sculpt.bbrush_right_mouse",
+        "sculpt.bbrush_face_sets_create_zbrush",
         BbrushSyncBrushShelfModifiers.bl_idname,
     }
 )
@@ -120,6 +121,16 @@ class BrushKeymap:
         keys.append((km, kmi))
 
         kmi = km.keymap_items.new("sculpt.bbrush_right_mouse", "RIGHTMOUSE", "PRESS", any=True)
+        keys.append((km, kmi))
+
+        kmi = km.keymap_items.new(
+            "sculpt.bbrush_face_sets_create_zbrush",
+            "W",
+            "PRESS",
+            ctrl=True,
+            shift=False,
+            alt=False,
+        )
         keys.append((km, kmi))
 
         # -1 = ignore modifier state. Defaults (0) mean "modifier must be off", so e.g.

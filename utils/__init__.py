@@ -191,8 +191,20 @@ def check_operator(operator: str) -> bool:
 
 def check_mouse_in_model(context, event) -> bool:
     """检查鼠标是否在模型上
-    使用gpu深度图快速测式
+    优先使用 CPU 射线检测（不触发 redraw_timer），必要时再回退到 GPU 深度图检测。
     """
+    try:
+        obj = getattr(context, "sculpt_object", None)
+        if obj is not None and getattr(context, "region", None) and getattr(context, "region_data", None):
+            mouse = (event.mouse_region_x, event.mouse_region_y)
+            depsgraph = context.evaluated_depsgraph_get()
+            object_eval = obj.evaluated_get(depsgraph)
+            result, _location, _normal, _index = object_ray_cast(object_eval, context, mouse)
+            return bool(result)
+    except Exception as e:
+        debug_log("check_mouse_in_model cpu ray cast failed:", repr(e))
+
+    # Fallback: GPU depth-buffer test (may force a redraw depending on implementation).
     from .gpu import get_mouse_location_ray_cast
     x, y = (event.mouse_region_x, event.mouse_region_y)
     return get_mouse_location_ray_cast(context, x, y)

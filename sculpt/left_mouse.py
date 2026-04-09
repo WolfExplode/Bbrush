@@ -4,6 +4,7 @@ from mathutils import Vector
 
 from .brush import BrushShape
 from ..debug import debug_log
+from ..adapter import sculpt_face_set_try_isolate_under_cursor
 from ..utils import object_ray_cast, check_mouse_in_model, get_pref, check_modal_operators, \
     check_mouse_in_depth_map_area
 from ..utils.manually_manage_events import ManuallyManageEvents
@@ -40,6 +41,11 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
             return {"FINISHED"}
 
         elif active_tool and active_tool.idname == "builtin_brush.draw_face_sets":
+            # Shift+Ctrl+click uses modal (isolate if no drag; otherwise stroke on move).
+            if event.shift and event.ctrl and not event.alt:
+                self.start_manually_manage_events(event)
+                context.window_manager.modal_handler_add(self)
+                return {"RUNNING_MODAL"}
             return self.brush_stroke(context, event)
         elif active_tool and "face_set" in active_tool.idname:
             """
@@ -95,6 +101,19 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
 
         if is_release:  # 单击
             debug_log("is_release", is_in_modal)
+            # ZBrush-style: Shift+Ctrl+click (no drag) on mesh isolates active face set.
+            if (
+                event.shift
+                and event.ctrl
+                and not event.alt
+                and is_in_modal
+                and not self.check_is_moving(event)
+            ):
+                # Always consume this chord; don't fall through to Bbrush click behaviors
+                # (e.g. HIDE mode invert visibility) if isolate fails for any reason.
+                debug_log("faceset_isolate_chord", "tool", getattr(active_tool, "idname", None))
+                sculpt_face_set_try_isolate_under_cursor(context, event)
+                return {"FINISHED"}
             if is_in_modal:  # 点在了其它模型上and not is_in_active_modal
                 try:
                     res = bpy.ops.object.transfer_mode("INVOKE_DEFAULT")  # object.transfer_mode 使用的c端gpu buffer检测

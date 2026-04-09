@@ -26,6 +26,35 @@ def _depth_buffer_indicates_model(numpy_buffer):
     return cr >= DEPTH_CONTENT_RATIO_THRESHOLD
 
 
+def _clamp_rect_to_viewport(x: int, y: int, w: int, h: int):
+    """Clamp a depth read rectangle to the current GPU viewport.
+
+    Prevents `read_depth` from throwing when x/y/w/h extend outside the framebuffer.
+    Returns (x, y, w, h) or None if the clamped rect is empty.
+    """
+    try:
+        vx, vy, vw, vh = gpu.state.viewport_get()
+    except Exception:
+        # Fallback: assume origin viewport. (Older builds should still have viewport_get.)
+        vx, vy, vw, vh = 0, 0, 0, 0
+
+    # If viewport size is unavailable, keep original values and let Blender raise/log.
+    if vw <= 0 or vh <= 0:
+        return x, y, w, h
+
+    # Clamp start.
+    x0 = max(vx, min(x, vx + vw - 1))
+    y0 = max(vy, min(y, vy + vh - 1))
+
+    # Clamp size so end stays inside.
+    w0 = min(w, (vx + vw) - x0)
+    h0 = min(h, (vy + vh) - y0)
+
+    if w0 <= 0 or h0 <= 0:
+        return None
+    return x0, y0, w0, h0
+
+
 def get_gpu_buffer(xy, wh=(1, 1), centered=False):
     """ 用于获取当前视图的GPU BUFFER
     :params xy: 获取的左下角坐标,带X 和Y信息
@@ -47,8 +76,11 @@ def get_gpu_buffer(xy, wh=(1, 1), centered=False):
         x -= w // 2
         y -= h // 2
 
-    depth_buffer = gpu.state.active_framebuffer_get().read_depth(x, y, w, h)
-    return depth_buffer
+    rect = _clamp_rect_to_viewport(x, y, w, h)
+    if rect is None:
+        return None
+    x, y, w, h = rect
+    return gpu.state.active_framebuffer_get().read_depth(x, y, w, h)
 
 
 def gpu_depth_ray_cast(x, y, data):
@@ -56,6 +88,9 @@ def gpu_depth_ray_cast(x, y, data):
     from . import get_pref
     size = get_pref().depth_ray_size
     _buffer = get_gpu_buffer((x, y), wh=(size, size), centered=True)
+    if _buffer is None:
+        data['is_in_model'] = False
+        return
     numpy_buffer = np.asarray(_buffer, dtype=np.float32).ravel()
     data['is_in_model'] = _depth_buffer_indicates_model(numpy_buffer)
 
@@ -85,6 +120,9 @@ def get_area_ray_cast(context, x, y, w, h):
 
     def get_ray_cast():
         buffer = get_gpu_buffer((x, y), wh=(w, h), centered=False)
+        if buffer is None:
+            data['is_in_model'] = False
+            return
         numpy_buffer = np.asarray(buffer, dtype=np.float32).ravel()
         data['is_in_model'] = _depth_buffer_indicates_model(numpy_buffer)
 
@@ -100,6 +138,85 @@ def get_area_ray_cast(context, x, y, w, h):
             bpy.types.SpaceView3D.draw_handler_remove(handler, 'WINDOW')
         view3d.shading.show_xray = show_xray
     return data.get('is_in_model', False)
+
+
+def schedule_area_ray_cast(context, x, y, w, h, request: dict) -> None:
+    """Schedule a one-shot GPU depth read on the next natural redraw.
+
+    This avoids `bpy.ops.wm.redraw_timer(...)` (which can spam Blender's "Draw region" warnings),
+    while keeping the same depth-buffer based hit testing.
+
+    `request` is a mutable dict used to store state:
+      - ready: bool
+      - is_in_model: bool
+      - handler: draw handler token (internal)
+      - rect: (x, y, w, h) last requested rect
+      - _show_xray: original xray state for restore
+    """
+    if request is None:
+        return
+
+    # Normalize inputs.
+    x, y, w, h = int(x), int(y), int(w), int(h)
+    rect = (x, y, w, h)
+
+    # If there's already a pending request for the same rect, do nothing.
+    if (not request.get("ready", True)) and request.get("rect") == rect:
+        if context.area:
+            context.area.tag_redraw()
+        return
+
+    # Cancel any previous handler.
+    handler = request.get("handler")
+    if handler is not None:
+        try:
+            bpy.types.SpaceView3D.draw_handler_remove(handler, "WINDOW")
+        except Exception as e:
+            debug_log("schedule_area_ray_cast: remove previous handler failed:", repr(e))
+        request["handler"] = None
+
+    request["rect"] = rect
+    request["ready"] = False
+
+    # Temporarily disable x-ray for the sample.
+    view3d = getattr(context, "space_data", None)
+    if view3d is not None and getattr(view3d, "shading", None) is not None:
+        request["_show_xray"] = bool(view3d.shading.show_xray)
+        view3d.shading.show_xray = False
+
+    def _one_shot():
+        try:
+            buffer = get_gpu_buffer((x, y), wh=(w, h), centered=False)
+            if buffer is None:
+                request["is_in_model"] = False
+            else:
+                numpy_buffer = np.asarray(buffer, dtype=np.float32).ravel()
+                request["is_in_model"] = _depth_buffer_indicates_model(numpy_buffer)
+        except Exception as e:
+            debug_log("schedule_area_ray_cast: sample failed:", repr(e))
+            request["is_in_model"] = False
+        finally:
+            request["ready"] = True
+            hnd = request.get("handler")
+            if hnd is not None:
+                try:
+                    bpy.types.SpaceView3D.draw_handler_remove(hnd, "WINDOW")
+                except Exception:
+                    pass
+                request["handler"] = None
+
+            # Restore x-ray.
+            if view3d is not None and getattr(view3d, "shading", None) is not None:
+                try:
+                    view3d.shading.show_xray = bool(request.get("_show_xray", False))
+                except Exception:
+                    pass
+
+    request["handler"] = bpy.types.SpaceView3D.draw_handler_add(_one_shot, (), "WINDOW", "POST_PIXEL")
+
+    # Ask Blender to redraw naturally.
+    if context.area:
+        context.area.tag_redraw()
 
 
 def draw_text(x,

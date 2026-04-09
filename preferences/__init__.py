@@ -1,7 +1,6 @@
 import bpy
 
 from .depth_map import DepthMap
-from .topbar import TopBar
 from .. import __package__ as base_name
 
 
@@ -27,23 +26,9 @@ class BBRUSH_OT_rebuild_keyconfig(bpy.types.Operator):
 class Preferences(
     bpy.types.AddonPreferences,
 
-    TopBar,
     DepthMap,
 ):
     bl_idname = base_name
-
-    def update_always_bbrush_mode(self, context):
-        from ..register_module import try_toggle_bbrush_mode
-        try_toggle_bbrush_mode()
-
-    always_use_bbrush_sculpt_mode: bpy.props.BoolProperty(
-        name="Always use Bbrush sculpting mode",
-        description=
-        "If entering sculpting mode, Bbrush mode will automatically activate; "
-        "if exiting sculpting mode, Bbrush mode will deactivate",
-        default=True,
-        update=update_always_bbrush_mode
-    )
 
     depth_ray_size: bpy.props.IntProperty(
         name="Depth ray check size(px)",
@@ -79,30 +64,15 @@ class Preferences(
         box = col.box()
         box.label(text="Sculpt")
         box.prop(self, "refresh_fps")
-        box.prop(self, "always_use_bbrush_sculpt_mode")
         box.prop(self, "depth_ray_size")
 
         box.prop(self, "enabled_drag_offset_compensation")
         box.prop(self, "drag_offset_compensation")
 
         sub_col = box.column()
-
-        sub_col.alert = True
-        if self.always_use_bbrush_sculpt_mode:
-            sub_col.label(text="Tips:Automatically enter Bbrush mode when entering carving mode")
-
-        sub_col.alert = False
         sub_col.operator(FixBbrushError.bl_idname)
-        ops = sub_col.operator("wm.url_open", icon="URL", text="Encountering a problem?")
-        ops.url = "https://github.com/AIGODLIKE/Bbrush/issues/new"
 
-        split = col.split()
-
-        column = split.column()
-        self.draw_top_ber(column)
-
-        column = split.column()
-        self.draw_depth(column)
+        self.draw_depth(col)
 
 
 def register():

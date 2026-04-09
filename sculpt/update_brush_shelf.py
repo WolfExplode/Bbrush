@@ -132,11 +132,15 @@ class UpdateBrushShelf(bpy.types.Operator):
             # return
             ...
 
-        key = (event.ctrl, event.alt, event.shift)
+        if event is None:
+            key = (False, False, False)
+        else:
+            key = (event.ctrl, event.alt, event.shift)
         mode = BRUSH_SHELF_MODE[key]  # 使用组合键来确认是否需要更新笔刷工具架
 
         if DEBUG_UPDATE_BRUSH_SHELF:
-            print(cls.bl_idname, "\t", mode, "\t", event.type, event.value)
+            ev = event
+            print(cls.bl_idname, "\t", mode, "\t", getattr(ev, "type", None), getattr(ev, "value", None))
 
         (active_tool, work_space_tool, index) = get_active_tool(context)
 

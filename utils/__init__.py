@@ -26,10 +26,6 @@ def check_display_mode_is_draw(context, display_mode: str) -> bool:
     return always or only_sculpt or only_bbrush
 
 
-def check_pref() -> bool:
-    return base_name in bpy.context.preferences.addons
-
-
 def get_pref():
     """获取偏好设置"""
     return bpy.context.preferences.addons[base_name].preferences

@@ -8,16 +8,7 @@ from .right_mouse import RightMouse
 from .update_brush_shelf import UpdateBrushShelf
 from .view_property import ViewProperty
 from ..debug import DEBUG_MODE_TOGGLE
-from ..utils import get_pref, refresh_ui
-
-"""
-通过运行时切换
-
-快捷键 keymap
-更新笔刷栏
-绘制快捷键
-视图偏好设置属性
-"""
+from ..utils import refresh_ui
 
 brush_runtime: "BrushRuntime|None" = None
 
@@ -29,73 +20,44 @@ class BrushRuntime:
     brush_mode = "NONE"
 
 
-class BbrushStart(bpy.types.Operator):
-    bl_idname = "brush.bbrush_start"
-    bl_label = "Bbrush Start"
+def start_bbrush(context, event=None):
+    """Activate Bbrush while in sculpt mode (no operator)."""
+    global brush_runtime
 
-    def invoke(self, context, event):
-        global brush_runtime
+    if DEBUG_MODE_TOGGLE:
+        print("start_bbrush")
 
-        if DEBUG_MODE_TOGGLE:
-            print(self.bl_idname)
+    if brush_runtime is not None:
+        return
 
-        # 确保只有一个运行时
-        if brush_runtime is not None:
-            return {"CANCELLED"}
+    brush_runtime = BrushRuntime()
 
-        self.start(context, event)
-        return {"FINISHED"}
+    UpdateBrushShelf.start_brush_shelf(context)
+    UpdateBrushShelf.update_brush_shelf(context, event)
+    UpdateBrushShelf.update_brush_shelf(context, event)
 
-    @staticmethod
-    def start(context, event):
-        global brush_runtime
-        brush_runtime = BrushRuntime()
-
-        if DEBUG_MODE_TOGGLE:
-            print("exit bbrush")
-
-        UpdateBrushShelf.start_brush_shelf(context)
-        UpdateBrushShelf.update_brush_shelf(context, event)
-        UpdateBrushShelf.update_brush_shelf(context, event)
-
-        BrushKeymap.start_key(context)
-        ViewProperty.start_view_property(context)
-        refresh_ui(context)
+    BrushKeymap.start_key(context)
+    ViewProperty.start_view_property(context)
+    refresh_ui(context)
 
 
-class BbrushExit(bpy.types.Operator):
-    bl_idname = "brush.bbrush_exit"
-    bl_label = "Bbrush Exit"
+def exit_bbrush(context, un_reg=False):
+    """Tear down Bbrush runtime (leaving sculpt mode or disabling addon)."""
+    global brush_runtime
 
-    exit_always: bpy.props.BoolProperty(default=False)
+    if brush_runtime is None:
+        return
 
-    def execute(self, context):
-        if DEBUG_MODE_TOGGLE:
-            print(self.bl_idname)
-        pref = get_pref()
-        if pref.always_use_bbrush_sculpt_mode and self.exit_always:
-            pref["always_use_bbrush_sculpt_mode"] = False
-        self.exit(context)
-        return {"FINISHED"}
+    if DEBUG_MODE_TOGGLE:
+        print("exit_bbrush", un_reg)
 
-    @staticmethod
-    def exit(context, un_reg=False):
-        """
-        :param context:
-        :param un_reg: 是注销操作
-        :return:
-        """
-        global brush_runtime
-        brush_runtime = None
+    brush_runtime = None
 
-        if DEBUG_MODE_TOGGLE:
-            print("exit bbrush")
+    BrushKeymap.restore_key(context)
+    UpdateBrushShelf.restore_brush_shelf()
+    ViewProperty.restore_view_property(context, un_reg)
 
-        BrushKeymap.restore_key(context)
-        UpdateBrushShelf.restore_brush_shelf()
-        ViewProperty.restore_view_property(context, un_reg)
-
-        refresh_ui(context)
+    refresh_ui(context)
 
 
 class FixBbrushError(bpy.types.Operator):
@@ -105,8 +67,9 @@ class FixBbrushError(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     def execute(self, context):
-        global brush_runtime
-        BbrushExit.exit(context)
+        exit_bbrush(context)
+        if context.mode == "SCULPT":
+            start_bbrush(context, None)
         return {"FINISHED"}
 
     @classmethod
@@ -120,8 +83,6 @@ def refresh_depth_map():
 
 
 class_list = [
-    BbrushStart,
-    BbrushExit,
     FixBbrushError,
     LeftMouse,
     RightMouse,

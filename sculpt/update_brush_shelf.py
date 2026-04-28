@@ -107,6 +107,14 @@ BRUSH_SHELF_MODE = {
 
 
 def set_brush_shelf(shelf_mode):
+    # Undo/mode-switch can clear global shelf state while key events still arrive.
+    # Rebuild lazily so modifier handlers never index a missing mode.
+    if shelf_mode not in brush_shelf:
+        if bpy.context is not None:
+            UpdateBrushShelf.start_brush_shelf(bpy.context)
+    if shelf_mode not in brush_shelf:
+        debug_log("set_brush_shelf skipped: missing shelf_mode", shelf_mode, "keys=", tuple(brush_shelf.keys()))
+        return
     shelf = brush_shelf[shelf_mode]
     tol = ToolSelectPanelHelper._tool_class_from_space_type("VIEW_3D")
     if tol._tools["SCULPT"] != shelf:
@@ -136,6 +144,10 @@ class UpdateBrushShelf:
         """更新笔刷资产架"""
         if context.space_data is None:
             return
+
+        # Defensive lazy init: undo can re-enter Sculpt without running mode-enter sync.
+        if "ORIGINAL" not in brush_shelf:
+            cls.start_brush_shelf(context)
 
         if event is None:
             key = (False, False, False)

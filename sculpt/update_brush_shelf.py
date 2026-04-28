@@ -119,6 +119,18 @@ class UpdateBrushShelf:
     # SCULPT, SMOOTH, HIDE, MASK, ORIGINAL
     brush_shelf_mode = "NONE"
 
+    @staticmethod
+    def _restore_active_tool_ui(context, mode: str) -> bool:
+        """Re-activate stored tool id so the top bar reflects the intended active brush."""
+        tool = active_brush_toolbar.get(mode)
+        if not tool:
+            return False
+        cls_helper = ToolSelectPanelHelper._tool_class_from_space_type("VIEW_3D")
+        item, _index = cls_helper._tool_get_by_id(context, tool)
+        if not item:
+            return False
+        return bool(activate_by_id(context, "VIEW_3D", tool))
+
     @classmethod
     def update_brush_shelf(cls, context, event):
         """更新笔刷资产架"""
@@ -152,6 +164,21 @@ class UpdateBrushShelf:
                 res = activate_by_id(context, "VIEW_3D", tool)
                 # if res:
                 #     bpy.ops.wm.tool_set_by_id(name=tool)
+
+        # UX choice:
+        # Blender's default Shift-smooth does not reliably expose Smooth settings in the top bar.
+        # We intentionally allow Smooth settings to show while Shift is held (better feedback),
+        # then force a tool-UI resync on Shift release so the top bar returns to the real active brush.
+        if (
+            event is not None
+            and event.type in {"LEFT_SHIFT", "RIGHT_SHIFT"}
+            and event.value == "RELEASE"
+            and mode == "SCULPT"
+        ):
+            restored = cls._restore_active_tool_ui(context, mode)
+            debug_log("shift_release_ui_resync", "restored=", restored, "tool=", active_brush_toolbar.get(mode))
+            if restored:
+                refresh_ui(context)
 
         from . import brush_runtime
         brush_runtime.brush_mode = mode

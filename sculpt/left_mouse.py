@@ -25,8 +25,10 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
         # CLICK_DRAG 在 5.0以上版本中拖动事件不易被触发
         """
         from . import brush_runtime
+        from . import handle_input_source_event
         from . import UpdateBrushShelf
 
+        handle_input_source_event(context, event)
         brush_runtime.left_mouse = Vector((event.mouse_x, event.mouse_y))
 
         UpdateBrushShelf.update_brush_shelf(context, event)
@@ -89,6 +91,8 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
 
     def modal(self, context, event):
         from . import UpdateBrushShelf
+        from . import handle_input_source_event
+        handle_input_source_event(context, event)
         UpdateBrushShelf.update_brush_shelf(context, event)
 
         is_release = event.value == "RELEASE"
@@ -188,12 +192,16 @@ def execute_brush_stroke(event):
     """https://docs.blender.org/api/5.0/bpy.ops.sculpt.html#bpy.ops.sculpt.brush_stroke
     https://docs.blender.org/api/5.1/bpy.ops.sculpt.html#bpy.ops.sculpt.brush_stroke
     在5.1中笔触操作被修改了"""
+    from . import ensure_shift_smooth_default_strength
+
     args = {}
     if bpy.app.version >= (5, 1, 0):
         if event.alt:
             args["mode"] = "INVERT"
             args["brush_toggle"] = "None"
         elif event.shift:
+            # Shift-smoothing uses Smooth brush from any active brush; ensure per-input default.
+            ensure_shift_smooth_default_strength(bpy.context)
             args["mode"] = "NORMAL"
             args["brush_toggle"] = "SMOOTH"
         else:
@@ -204,6 +212,8 @@ def execute_brush_stroke(event):
         if event.alt:
             args["mode"] = "INVERT"
         elif event.shift:
+            # Blender < 5.1 smooth mode path.
+            ensure_shift_smooth_default_strength(bpy.context)
             args["mode"] = "SMOOTH"
         else:
             args["mode"] = "NORMAL"

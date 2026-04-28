@@ -12,6 +12,28 @@ from ..utils import refresh_ui
 brush_runtime: "BrushRuntime|None" = None
 
 
+def _first_space_view3d(context):
+    """从当前上下文或屏幕中解析一个 SpaceView3D（operator 非 3D 区域调用时 space_data 可能为 None）。"""
+    sd = getattr(context, "space_data", None)
+    if sd is not None and getattr(sd, "type", None) == "VIEW_3D":
+        return sd
+    area = getattr(context, "area", None)
+    if area is not None and area.type == "VIEW_3D":
+        s = area.spaces.active
+        if s is not None and getattr(s, "type", None) == "VIEW_3D":
+            return s
+    screen = getattr(context, "screen", None)
+    if screen is None:
+        return None
+    for a in screen.areas:
+        if a.type != "VIEW_3D":
+            continue
+        s = a.spaces.active
+        if s is not None and getattr(s, "type", None) == "VIEW_3D":
+            return s
+    return None
+
+
 class BrushRuntime:
     left_mouse = Vector((0, 0))  # 偏移䃼尝用
 
@@ -39,7 +61,9 @@ def activate_sculpt_brush_shelf(context, event=None):
         _apply_smooth_default_strength_for_source(context, source, reason="sculpt_enter_init")
 
     refresh_ui(context)
-
+    v3d = _first_space_view3d(context)
+    if v3d is not None:
+        v3d.overlay.show_floor = False
 
 def deactivate_sculpt_brush_shelf(context):
     """Restore Blender's default sculpt tool shelf when leaving sculpt mode."""

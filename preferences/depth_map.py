@@ -1,15 +1,8 @@
 import bpy
-import gpu
 
 from ..utils import DISPLAY_ITEMS
 
 default_depth_display_mode = "NOT_DISPLAY"
-
-try:
-    if gpu.platform.device_type_get() != "AMD":
-        default_depth_display_mode = "ONLY_SCULPT"
-except Exception:
-    pass
 
 
 class DepthMap:

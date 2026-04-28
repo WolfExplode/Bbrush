@@ -62,6 +62,11 @@ class RightMouse(bpy.types.Operator, ManuallyManageEvents):
         from . import UpdateBrushShelf
         UpdateBrushShelf.update_brush_shelf(context, event)
 
+        # Do not consume Shift+RMB so other add-ons can use it
+        # (e.g. HDRI rotation gesture in sculpt mode).
+        if event.shift and not event.ctrl and not event.alt:
+            return {"PASS_THROUGH"}
+
         if check_mouse_in_depth_map_area(event):
             bpy.ops.sculpt.bbrush_depth_move("INVOKE_DEFAULT")
             return {"FINISHED"}

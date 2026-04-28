@@ -154,41 +154,44 @@ def draw_box(x1, x2, y1, y2):
 
 def draw_gpu_buffer(context, depth_buffer):
     gpu.state.depth_mask_set(False)
+    try:
+        depth_scale = get_pref().depth_scale
+        if "draw_error" not in depth_buffer:
+            with gpu.matrix.push_pop():
+                gpu.matrix.scale([2, 2])
+                gpu.matrix.translate([-0.5, -0.5, 0])
+                gpu.matrix.translate(depth_buffer["translate"])
+                gpu.matrix.scale([depth_scale, depth_scale])
+                try:
+                    region_3d = context.space_data.region_3d
+                    view_matrix = region_3d.view_matrix
+                    matrix_hash = str(hash(view_matrix.copy().freeze()))
+                    region_hash = str(hash(context.region))
+                    modal_operators_len = len(bpy.context.window.modal_operators)
 
-    depth_scale = get_pref().depth_scale
-    if "draw_error" not in depth_buffer:
-        with gpu.matrix.push_pop():
-            gpu.matrix.scale([2, 2])
-            gpu.matrix.translate([-0.5, -0.5, 0])
-            gpu.matrix.translate(depth_buffer["translate"])
-            gpu.matrix.scale([depth_scale, depth_scale])
-            try:
-                region_3d = context.space_data.region_3d
-                view_matrix = region_3d.view_matrix
-                matrix_hash = str(hash(view_matrix.copy().freeze()))
-                region_hash = str(hash(context.region))
-                modal_operators_len = len(bpy.context.window.modal_operators)
-
-                draw_shader_old(
-                    region_hash,
-                    matrix_hash,
-                    modal_operators_len,
-                    context.region.width,
-                    context.region.height)  # 使用自定义着色器绘制,将会快很多
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                traceback.print_stack()
-                return e.args
-    else:
-        error_text = depth_buffer["draw_error"]
-        draw_box(*depth_buffer["draw_box"])
-        x, y = depth_buffer["text_location"]
-        font_id = 0
-        blf.position(font_id, x, y, 0)
-        blf.draw(font_id, str(error_text))
-        blf.position(font_id, x, y + 20, 0)
-        blf.draw(font_id, "Drag Depth Map Error")
+                    draw_shader_old(
+                        region_hash,
+                        matrix_hash,
+                        modal_operators_len,
+                        context.region.width,
+                        context.region.height)  # 使用自定义着色器绘制,将会快很多
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    traceback.print_stack()
+                    return e.args
+        else:
+            error_text = depth_buffer["draw_error"]
+            draw_box(*depth_buffer["draw_box"])
+            x, y = depth_buffer["text_location"]
+            font_id = 0
+            blf.position(font_id, x, y, 0)
+            blf.draw(font_id, str(error_text))
+            blf.position(font_id, x, y + 20, 0)
+            blf.draw(font_id, "Drag Depth Map Error")
+    finally:
+        # Avoid leaking GPU depth-write state to other add-ons/operators.
+        gpu.state.depth_mask_set(True)
 
 
 def clear_gpu_cache():

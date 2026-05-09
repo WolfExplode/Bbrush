@@ -40,9 +40,10 @@ class BrushRuntime:
     # SCULPT,SMOOTH,HIDE,MASK,ORIGINAL
     brush_mode = "NONE"
 
-    # Blender 5.1+: Shift-only temporarily activates Essentials Smooth via brush.asset_activate.
-    shift_smooth_active = False
-    shift_smooth_saved_ref = None  # (asset_library_type, asset_library_identifier, relative_asset_identifier)
+    # Blender 5.1+: Shift holds secondary brush slot; release restores primary (brush.asset_activate).
+    shift_secondary_active = False
+    shift_primary_saved_ref = None  # snapshot when Shift pressed
+    shift_secondary_brush_ref = None  # remembered secondary asset triple (updated if user changes brush while Shift held)
 
 
 def activate_sculpt_brush_shelf(context, event=None):
@@ -58,9 +59,9 @@ def activate_sculpt_brush_shelf(context, event=None):
 
 def deactivate_sculpt_brush_shelf(context):
     """Restore Blender's default sculpt tool shelf when leaving sculpt mode."""
-    from .shift_smooth_brush import clear_shift_smooth_override
+    from .shift_secondary_brush import clear_shift_secondary_override
 
-    clear_shift_smooth_override(context)
+    clear_shift_secondary_override(context)
     if "ORIGINAL" in brush_shelf:
         UpdateBrushShelf.restore_brush_shelf()
     refresh_ui(context)
@@ -68,10 +69,10 @@ def deactivate_sculpt_brush_shelf(context):
 
 def unregister_addon_runtime(context):
     """Full teardown when the add-on is disabled (keymaps + shelf)."""
-    from .shift_smooth_brush import clear_shift_smooth_override
+    from .shift_secondary_brush import clear_shift_secondary_override
 
     debug_log("unregister_addon_runtime")
-    clear_shift_smooth_override(context)
+    clear_shift_secondary_override(context)
     try:
         BrushKeymap.restore_key(context)
     except Exception as e:

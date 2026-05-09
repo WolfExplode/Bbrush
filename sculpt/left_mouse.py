@@ -195,11 +195,11 @@ def execute_brush_stroke(event):
             args["brush_toggle"] = "None"
         elif event.shift:
             args["mode"] = "NORMAL"
-            # Shift-only: brush already swapped to Essentials Smooth via modifier sync.
+            # Shift-only: brush already swapped to secondary slot via modifier sync.
             from . import brush_runtime
 
             args["brush_toggle"] = (
-                "None" if brush_runtime.shift_smooth_active else "SMOOTH"
+                "None" if brush_runtime.shift_secondary_active else "SMOOTH"
             )
         else:
             args["mode"] = "NORMAL"

@@ -40,6 +40,10 @@ class BrushRuntime:
     # SCULPT,SMOOTH,HIDE,MASK,ORIGINAL
     brush_mode = "NONE"
 
+    # Blender 5.1+: Shift-only temporarily activates Essentials Smooth via brush.asset_activate.
+    shift_smooth_active = False
+    shift_smooth_saved_ref = None  # (asset_library_type, asset_library_identifier, relative_asset_identifier)
+
 
 def activate_sculpt_brush_shelf(context, event=None):
     """Build / refresh Bbrush tool shelf while in sculpt mode."""
@@ -54,6 +58,9 @@ def activate_sculpt_brush_shelf(context, event=None):
 
 def deactivate_sculpt_brush_shelf(context):
     """Restore Blender's default sculpt tool shelf when leaving sculpt mode."""
+    from .shift_smooth_brush import clear_shift_smooth_override
+
+    clear_shift_smooth_override(context)
     if "ORIGINAL" in brush_shelf:
         UpdateBrushShelf.restore_brush_shelf()
     refresh_ui(context)
@@ -61,7 +68,10 @@ def deactivate_sculpt_brush_shelf(context):
 
 def unregister_addon_runtime(context):
     """Full teardown when the add-on is disabled (keymaps + shelf)."""
+    from .shift_smooth_brush import clear_shift_smooth_override
+
     debug_log("unregister_addon_runtime")
+    clear_shift_smooth_override(context)
     try:
         BrushKeymap.restore_key(context)
     except Exception as e:

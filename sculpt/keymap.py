@@ -30,9 +30,11 @@ class BbrushSyncBrushShelfModifiers(bpy.types.Operator):
         return context.mode == "SCULPT"
 
     def invoke(self, context, event):
+        from .shift_smooth_brush import sync_shift_smooth_brush
         from .update_brush_shelf import UpdateBrushShelf
 
         UpdateBrushShelf.update_brush_shelf(context, event)
+        sync_shift_smooth_brush(context, event)
         return {"PASS_THROUGH"}
 
 

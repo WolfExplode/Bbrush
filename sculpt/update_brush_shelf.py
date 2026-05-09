@@ -106,6 +106,19 @@ BRUSH_SHELF_MODE = {
 }
 
 
+def _tool_id_in_sculpt_shelf(idname: str) -> bool:
+    """True if idname is one of the tools in the SCULPT brush shelf (not mask/hide)."""
+    if not idname:
+        return False
+    tools = brush_shelf.get("SCULPT")
+    if not tools:
+        return False
+    for tool in tools:
+        if isinstance(tool, ToolDef) and tool.idname == idname:
+            return True
+    return False
+
+
 def set_brush_shelf(shelf_mode):
     # Undo/mode-switch can clear global shelf state while key events still arrive.
     # Rebuild lazily so modifier handlers never index a missing mode.
@@ -127,18 +140,6 @@ class UpdateBrushShelf:
     # SCULPT, SMOOTH, HIDE, MASK, ORIGINAL
     brush_shelf_mode = "NONE"
 
-    @staticmethod
-    def _restore_active_tool_ui(context, mode: str) -> bool:
-        """Re-activate stored tool id so the top bar reflects the intended active brush."""
-        tool = active_brush_toolbar.get(mode)
-        if not tool:
-            return False
-        cls_helper = ToolSelectPanelHelper._tool_class_from_space_type("VIEW_3D")
-        item, _index = cls_helper._tool_get_by_id(context, tool)
-        if not item:
-            return False
-        return bool(activate_by_id(context, "VIEW_3D", tool))
-
     @classmethod
     def update_brush_shelf(cls, context, event):
         """更新笔刷资产架"""
@@ -157,6 +158,19 @@ class UpdateBrushShelf:
 
         ev = event
         debug_log("UpdateBrushShelf", "\t", mode, "\t", getattr(ev, "type", None), getattr(ev, "value", None))
+
+        # Capture the active sculpt tool as Shift is pressed so the SCULPT slot
+        # tracks the user's real brush choice instead of the temporary Smooth UI.
+        if (
+            mode == "SCULPT"
+            and ev is not None
+            and ev.type in {"LEFT_SHIFT", "RIGHT_SHIFT"}
+            and ev.value == "PRESS"
+        ):
+            snap_tool, _w, _i = get_active_tool(context)
+            if snap_tool and _tool_id_in_sculpt_shelf(snap_tool.idname):
+                active_brush_toolbar["SCULPT"] = snap_tool.idname
+                debug_log("shift_press_sculpt_tool_snapshot", snap_tool.idname)
 
         (active_tool, work_space_tool, index) = get_active_tool(context)
 
@@ -177,20 +191,12 @@ class UpdateBrushShelf:
                 # if res:
                 #     bpy.ops.wm.tool_set_by_id(name=tool)
 
-        # UX choice:
-        # Blender's default Shift-smooth does not reliably expose Smooth settings in the top bar.
-        # We intentionally allow Smooth settings to show while Shift is held (better feedback),
-        # then force a tool-UI resync on Shift release so the top bar returns to the real active brush.
-        if (
-            event is not None
-            and event.type in {"LEFT_SHIFT", "RIGHT_SHIFT"}
-            and event.value == "RELEASE"
-            and mode == "SCULPT"
-        ):
-            restored = cls._restore_active_tool_ui(context, mode)
-            debug_log("shift_release_ui_resync", "restored=", restored, "tool=", active_brush_toolbar.get(mode))
-            if restored:
-                refresh_ui(context)
+        # While Shift is held, Blender may temporarily show Smooth; do not overwrite the slot.
+        # Run after mode/tool updates so we keep the SCULPT slot synced to the real tool.
+        if mode == "SCULPT" and (event is None or not event.shift):
+            sync_tool, _w, _i = get_active_tool(context)
+            if sync_tool and _tool_id_in_sculpt_shelf(sync_tool.idname):
+                active_brush_toolbar["SCULPT"] = sync_tool.idname
 
         from . import brush_runtime
         brush_runtime.brush_mode = mode

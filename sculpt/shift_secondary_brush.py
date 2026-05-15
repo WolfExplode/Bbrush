@@ -1,4 +1,7 @@
-"""Blender 5.1+: Shift holds a secondary brush slot (default: custom smooth → Essentials fallback); release restores primary."""
+"""Blender 5.1+: Shift+LMB sculpt uses a secondary brush slot; Shift release restores primary.
+
+Secondary is not activated on Shift alone (so Shift+F and other Shift shortcuts stay on the primary brush).
+"""
 
 import bpy
 
@@ -44,36 +47,21 @@ def _activate_default_secondary_chain(context) -> bool:
     return False
 
 
-def sync_shift_secondary_brush(context, event):
-    """Shift press/release: swap to secondary slot or restore primary."""
+def _shift_only(event) -> bool:
+    return event.shift and not event.ctrl and not event.alt
+
+
+def ensure_shift_secondary_for_sculpt(context, event) -> bool:
+    """Activate secondary before the first sculpt stroke (Shift+LMB, not Shift alone)."""
     if bpy.app.version < (5, 1, 0):
-        return
-    if event is None:
-        return
-    if event.type not in {"LEFT_SHIFT", "RIGHT_SHIFT"}:
-        return
+        return False
+    if event is None or not _shift_only(event):
+        return False
 
     from . import brush_runtime
 
-    if event.value == "RELEASE":
-        if not event.shift and brush_runtime.shift_secondary_active:
-            # Whatever brush is active now (e.g. picked from Asset Shelf) becomes the remembered secondary.
-            brush_runtime.shift_secondary_brush_ref = _read_brush_asset_triple(context)
-            _activate_brush_asset(context, brush_runtime.shift_primary_saved_ref)
-            brush_runtime.shift_secondary_active = False
-            debug_log(
-                "shift_secondary_restore",
-                "saved_slot=",
-                brush_runtime.shift_secondary_brush_ref,
-                "primary=",
-                brush_runtime.shift_primary_saved_ref,
-            )
-        return
-
-    if event.ctrl or event.alt:
-        return
     if brush_runtime.shift_secondary_active:
-        return
+        return True
 
     brush_runtime.shift_primary_saved_ref = _read_brush_asset_triple(context)
 
@@ -88,6 +76,61 @@ def sync_shift_secondary_brush(context, event):
         debug_log("shift_secondary_activate")
     else:
         debug_log("shift_secondary_activate_failed", brush_runtime.shift_primary_saved_ref)
+    return ok
+
+
+def mark_shift_secondary_sculpt_used():
+    if bpy.app.version < (5, 1, 0):
+        return
+    from . import brush_runtime
+
+    if brush_runtime.shift_secondary_active:
+        brush_runtime.shift_secondary_used_for_sculpt = True
+
+
+def restore_shift_secondary_brush(context, *, remember_secondary: bool = False):
+    if bpy.app.version < (5, 1, 0):
+        return
+    from . import brush_runtime
+
+    if not brush_runtime.shift_secondary_active:
+        return
+
+    if remember_secondary and brush_runtime.shift_secondary_used_for_sculpt:
+        brush_runtime.shift_secondary_brush_ref = _read_brush_asset_triple(context)
+
+    _activate_brush_asset(context, brush_runtime.shift_primary_saved_ref)
+    brush_runtime.shift_secondary_active = False
+    brush_runtime.shift_secondary_used_for_sculpt = False
+    debug_log(
+        "shift_secondary_restore",
+        "remembered=",
+        remember_secondary,
+        "slot=",
+        brush_runtime.shift_secondary_brush_ref,
+    )
+
+
+def sync_shift_secondary_brush(context, event):
+    """Shift release only: restore primary (defer activation to LMB sculpt)."""
+    if bpy.app.version < (5, 1, 0):
+        return
+    if event is None:
+        return
+    if event.type not in {"LEFT_SHIFT", "RIGHT_SHIFT"}:
+        return
+    if event.value != "RELEASE" or event.shift:
+        return
+
+    from . import brush_runtime
+
+    if not brush_runtime.shift_secondary_active:
+        return
+
+    restore_shift_secondary_brush(
+        context,
+        remember_secondary=brush_runtime.shift_secondary_used_for_sculpt,
+    )
 
 
 def clear_shift_secondary_override(context):
@@ -97,6 +140,7 @@ def clear_shift_secondary_override(context):
 
     if not getattr(brush_runtime, "shift_secondary_active", False):
         return
-    brush_runtime.shift_secondary_brush_ref = _read_brush_asset_triple(context)
-    _activate_brush_asset(context, brush_runtime.shift_primary_saved_ref)
-    brush_runtime.shift_secondary_active = False
+    restore_shift_secondary_brush(
+        context,
+        remember_secondary=getattr(brush_runtime, "shift_secondary_used_for_sculpt", False),
+    )

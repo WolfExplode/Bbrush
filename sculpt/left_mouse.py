@@ -36,6 +36,12 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
         # This avoids repeated redraw_timer calls (which cause "Draw region" warnings/spinner).
         self._press_in_model = check_mouse_in_model(context, event)
 
+        only_shift = event.shift and not event.alt and not event.ctrl
+        if only_shift and self._press_in_model:
+            from .shift_secondary_brush import ensure_shift_secondary_for_sculpt
+
+            ensure_shift_secondary_for_sculpt(context, event)
+
         if check_mouse_in_depth_map_area(event):  # 缩放深度图
             bpy.ops.sculpt.bbrush_depth_scale("INVOKE_DEFAULT")
             return {"FINISHED"}
@@ -162,6 +168,15 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
 
     @staticmethod
     def brush_stroke(context, event):
+        only_shift = event.shift and not event.alt and not event.ctrl
+        if only_shift:
+            from .shift_secondary_brush import (
+                ensure_shift_secondary_for_sculpt,
+                mark_shift_secondary_sculpt_used,
+            )
+
+            if ensure_shift_secondary_for_sculpt(context, event):
+                mark_shift_secondary_sculpt_used()
         mouse_offset_compensation(context, event)
         try:
             execute_brush_stroke(event)
@@ -195,7 +210,7 @@ def execute_brush_stroke(event):
             args["brush_toggle"] = "None"
         elif event.shift:
             args["mode"] = "NORMAL"
-            # Shift-only: brush already swapped to secondary slot via modifier sync.
+            # Shift-only: secondary asset activated on LMB sculpt (not on Shift alone).
             from . import brush_runtime
 
             args["brush_toggle"] = (

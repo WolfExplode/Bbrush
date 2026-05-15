@@ -40,10 +40,11 @@ class BrushRuntime:
     # SCULPT,SMOOTH,HIDE,MASK,ORIGINAL
     brush_mode = "NONE"
 
-    # Blender 5.1+: Shift holds secondary brush slot; release restores primary (brush.asset_activate).
+    # Blender 5.1+: Shift+LMB sculpt uses secondary slot; Shift release restores primary.
     shift_secondary_active = False
-    shift_primary_saved_ref = None  # snapshot when Shift pressed
-    shift_secondary_brush_ref = None  # remembered secondary asset triple (updated if user changes brush while Shift held)
+    shift_secondary_used_for_sculpt = False  # set when a stroke used secondary this Shift hold
+    shift_primary_saved_ref = None  # snapshot when secondary is activated for sculpt
+    shift_secondary_brush_ref = None  # remembered secondary asset triple (updated after sculpt + Shift release)
 
 
 def activate_sculpt_brush_shelf(context, event=None):

@@ -69,8 +69,7 @@ def sculpt_mesh_has_nonzero_mask(context) -> bool:
     except Exception:
         pass
 
-    # In Blender 5.1 the sculpt mask is stored as ".sculpt_mask" (leading dot = internal).
-    attr = mesh.attributes.get(".sculpt_mask") or mesh.attributes.get("sculpt_mask")
+    attr = _get_sculpt_mask_attribute(mesh)
     if attr is None:
         return False
     try:
@@ -78,6 +77,196 @@ def sculpt_mesh_has_nonzero_mask(context) -> bool:
     except Exception:
         n = len(mesh.vertices)
     return _attribute_has_nonzero_mask_values(attr, n)
+
+
+def _get_sculpt_mask_attribute(mesh):
+    return mesh.attributes.get(".sculpt_mask") or mesh.attributes.get("sculpt_mask")
+
+
+def _read_sculpt_mask_values(mesh, vert_count: int):
+    """Read per-vertex sculpt mask weights as float32 in [0, 1], or None if no mask attribute."""
+    mask_attr = _get_sculpt_mask_attribute(mesh)
+    if mask_attr is None:
+        return None
+
+    data_type = getattr(mask_attr, "data_type", "FLOAT")
+    if data_type == "BOOLEAN":
+        try:
+            import numpy as np
+
+            buf = np.zeros(vert_count, dtype=np.bool_)
+            mask_attr.data.foreach_get("value", buf)
+            return buf.astype(np.float32)
+        except Exception:
+            values = []
+            for i in range(vert_count):
+                try:
+                    values.append(1.0 if bool(mask_attr.data[i].value) else 0.0)
+                except (AttributeError, TypeError, ValueError, IndexError):
+                    values.append(0.0)
+            return values
+
+    try:
+        import numpy as np
+
+        buf = np.zeros(vert_count, dtype=np.float32)
+        mask_attr.data.foreach_get("value", buf)
+        np.clip(buf, 0.0, 1.0, out=buf)
+        return buf
+    except Exception:
+        values = []
+        for i in range(vert_count):
+            try:
+                values.append(min(1.0, max(0.0, float(mask_attr.data[i].value))))
+            except (AttributeError, TypeError, ValueError, IndexError):
+                values.append(0.0)
+        return values
+
+
+def _ensure_sculpt_mask_attribute(mesh):
+    """Return the mesh sculpt-mask attribute, creating a FLOAT point attribute if needed."""
+    mask_attr = _get_sculpt_mask_attribute(mesh)
+    if mask_attr is not None:
+        return mask_attr
+    for name in (".sculpt_mask", "sculpt_mask"):
+        try:
+            return mesh.attributes.new(name, "FLOAT", "POINT")
+        except RuntimeError:
+            continue
+    return None
+
+
+def sculpt_mask_from_active_vertex_group(context) -> set:
+    """Set sculpt mask weights from the object's active vertex group."""
+    obj = context.sculpt_object
+    if not obj or obj.type != "MESH":
+        return {"CANCELLED"}
+
+    vg = obj.vertex_groups.active
+    if vg is None:
+        return {"CANCELLED"}
+
+    mesh = obj.data
+    if type(mesh).__name__ != "Mesh":
+        return {"CANCELLED"}
+
+    vert_count = len(mesh.vertices)
+    if vert_count == 0:
+        return {"CANCELLED"}
+
+    try:
+        context.view_layer.update()
+    except Exception:
+        pass
+
+    mask_attr = _ensure_sculpt_mask_attribute(mesh)
+    if mask_attr is None:
+        return {"CANCELLED"}
+
+    vg_index = vg.index
+    data_type = getattr(mask_attr, "data_type", "FLOAT")
+
+    if data_type == "BOOLEAN":
+        values = []
+        for i in range(vert_count):
+            try:
+                values.append(vg.weight(i) > 0.0)
+            except RuntimeError:
+                values.append(False)
+        try:
+            import numpy as np
+
+            mask_attr.data.foreach_set("value", np.array(values, dtype=np.bool_))
+        except Exception:
+            for i, val in enumerate(values):
+                mask_attr.data[i].value = val
+    else:
+        try:
+            import numpy as np
+
+            weights = np.zeros(vert_count, dtype=np.float32)
+            for i in range(vert_count):
+                try:
+                    weights[i] = vg.weight(i)
+                except RuntimeError:
+                    pass
+            np.clip(weights, 0.0, 1.0, out=weights)
+            mask_attr.data.foreach_set("value", weights)
+        except Exception:
+            for i in range(vert_count):
+                try:
+                    mask_attr.data[i].value = min(1.0, max(0.0, float(vg.weight(i))))
+                except RuntimeError:
+                    mask_attr.data[i].value = 0.0
+
+    mesh.update_tag()
+    return {"FINISHED"}
+
+
+def _vertex_group_assign_mask_weights(vg, weights, *, mode: str, vert_count: int):
+    """Assign per-vertex mask weights to a vertex group (mode: REPLACE or ADD)."""
+    threshold = 1e-6
+    try:
+        import numpy as np
+
+        if isinstance(weights, np.ndarray):
+            if mode == "ADD":
+                for i in range(vert_count):
+                    w = float(weights[i])
+                    if w > threshold:
+                        vg.add([i], w, mode)
+            else:
+                for i in range(vert_count):
+                    vg.add([i], float(weights[i]), mode)
+            return
+    except ImportError:
+        pass
+
+    if mode == "ADD":
+        for i in range(vert_count):
+            w = float(weights[i])
+            if w > threshold:
+                vg.add([i], w, mode)
+    else:
+        for i in range(vert_count):
+            vg.add([i], float(weights[i]), mode)
+
+
+def sculpt_vertex_group_from_mask(context, *, new_group: bool) -> set:
+    """Write sculpt mask into a new vertex group (REPLACE) or add into the active group."""
+    obj = context.sculpt_object
+    if not obj or obj.type != "MESH":
+        return {"CANCELLED"}
+
+    mesh = obj.data
+    if type(mesh).__name__ != "Mesh":
+        return {"CANCELLED"}
+
+    vert_count = len(mesh.vertices)
+    if vert_count == 0:
+        return {"CANCELLED"}
+
+    try:
+        context.view_layer.update()
+    except Exception:
+        pass
+
+    weights = _read_sculpt_mask_values(mesh, vert_count)
+    if weights is None:
+        return {"CANCELLED"}
+
+    if new_group:
+        vg = obj.vertex_groups.new(name="Mask")
+        obj.vertex_groups.active_index = vg.index
+        _vertex_group_assign_mask_weights(vg, weights, mode="REPLACE", vert_count=vert_count)
+    else:
+        vg = obj.vertex_groups.active
+        if vg is None:
+            return {"CANCELLED"}
+        _vertex_group_assign_mask_weights(vg, weights, mode="ADD", vert_count=vert_count)
+
+    mesh.update_tag()
+    return {"FINISHED"}
 
 
 def sculpt_face_sets_create_zbrush_ctrl_w(context) -> set:

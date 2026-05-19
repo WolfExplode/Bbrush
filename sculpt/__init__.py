@@ -85,6 +85,124 @@ def unregister_addon_runtime(context):
     refresh_ui(context)
 
 
+def _draw_view3d_mask_menu(self, context):
+    layout = self.layout
+    layout.separator()
+    layout.menu("SCULPT_MT_bbrush_mask_to_vertex_group")
+    layout.operator(
+        "sculpt.bbrush_mask_from_active_vertex_group",
+        text="Mask from Selected Vertex Group",
+    )
+
+
+class SCULPT_MT_bbrush_mask_to_vertex_group(bpy.types.Menu):
+    bl_label = "Mask to Vertex Group"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator(
+            "sculpt.bbrush_mask_to_vertex_group_new",
+            text="New Vertex Group",
+        )
+        layout.operator(
+            "sculpt.bbrush_mask_to_vertex_group_active",
+            text="Add to Selected Vertex Group",
+        )
+
+
+class _MaskToVertexGroupPoll:
+    @classmethod
+    def poll(cls, context):
+        from ..adapter import sculpt_mesh_has_nonzero_mask
+
+        obj = context.sculpt_object
+        return (
+            context.mode == "SCULPT"
+            and obj is not None
+            and obj.type == "MESH"
+            and sculpt_mesh_has_nonzero_mask(context)
+        )
+
+
+class MaskToVertexGroupNew(_MaskToVertexGroupPoll, bpy.types.Operator):
+    bl_idname = "sculpt.bbrush_mask_to_vertex_group_new"
+    bl_label = "Mask to New Vertex Group"
+    bl_description = "Create a new vertex group and set its weights from the sculpt mask"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        from ..adapter import sculpt_vertex_group_from_mask
+
+        res = sculpt_vertex_group_from_mask(context, new_group=True)
+        if res == {"FINISHED"}:
+            vg = context.sculpt_object.vertex_groups.active
+            name = vg.name if vg else "Mask"
+            self.report({"INFO"}, f"Created vertex group \"{name}\" from mask")
+            refresh_ui(context)
+            return {"FINISHED"}
+        self.report({"WARNING"}, "Could not create vertex group from mask")
+        return {"CANCELLED"}
+
+
+class MaskToVertexGroupActive(_MaskToVertexGroupPoll, bpy.types.Operator):
+    bl_idname = "sculpt.bbrush_mask_to_vertex_group_active"
+    bl_label = "Mask to Selected Vertex Group"
+    bl_description = (
+        "Add sculpt mask weights onto the active vertex group "
+        "(Object Data Properties > Vertex Groups)"
+    )
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.sculpt_object
+        return super().poll(context) and obj.vertex_groups.active is not None
+
+    def execute(self, context):
+        from ..adapter import sculpt_vertex_group_from_mask
+
+        vg = context.sculpt_object.vertex_groups.active
+        res = sculpt_vertex_group_from_mask(context, new_group=False)
+        if res == {"FINISHED"}:
+            self.report({"INFO"}, f"Added mask weights to vertex group \"{vg.name}\"")
+            refresh_ui(context)
+            return {"FINISHED"}
+        self.report({"WARNING"}, "Could not add mask to vertex group")
+        return {"CANCELLED"}
+
+
+class MaskFromActiveVertexGroup(bpy.types.Operator):
+    bl_idname = "sculpt.bbrush_mask_from_active_vertex_group"
+    bl_label = "Mask from Selected Vertex Group"
+    bl_description = (
+        "Set the sculpt mask from the active vertex group "
+        "(Object Data Properties > Vertex Groups)"
+    )
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.sculpt_object
+        return (
+            context.mode == "SCULPT"
+            and obj is not None
+            and obj.type == "MESH"
+            and obj.vertex_groups.active is not None
+        )
+
+    def execute(self, context):
+        from ..adapter import sculpt_mask_from_active_vertex_group
+
+        vg = context.sculpt_object.vertex_groups.active
+        res = sculpt_mask_from_active_vertex_group(context)
+        if res == {"FINISHED"}:
+            self.report({"INFO"}, f"Mask set from vertex group \"{vg.name}\"")
+            refresh_ui(context)
+            return {"FINISHED"}
+        self.report({"WARNING"}, "Could not set mask from vertex group")
+        return {"CANCELLED"}
+
+
 class FaceSetsCreateZbrushCtrlW(bpy.types.Operator):
     bl_idname = "sculpt.bbrush_face_sets_create_zbrush"
     bl_label = "Face Set from Mask or Visible"
@@ -132,6 +250,10 @@ class FixBbrushError(bpy.types.Operator):
 
 
 class_list = [
+    SCULPT_MT_bbrush_mask_to_vertex_group,
+    MaskToVertexGroupNew,
+    MaskToVertexGroupActive,
+    MaskFromActiveVertexGroup,
     FaceSetsCreateZbrushCtrlW,
     FixBbrushError,
     BbrushSyncBrushShelfModifiers,
@@ -147,8 +269,10 @@ def register():
     brush_runtime = BrushRuntime()
     brush.register()
     register_class()
+    bpy.types.VIEW3D_MT_mask.append(_draw_view3d_mask_menu)
 
 
 def unregister():
+    bpy.types.VIEW3D_MT_mask.remove(_draw_view3d_mask_menu)
     brush.unregister()
     unregister_class()

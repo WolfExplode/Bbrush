@@ -1,6 +1,6 @@
 import bpy
 
-from .click import BrushClick
+from .click import BrushClick, BbrushMaskGrowShrinkHotkey
 from .depth import BrushDepthScale, BrushDepthMove
 from .shape import BrushShape
 
@@ -8,6 +8,7 @@ from .shape import BrushShape
 brush = [
     BrushShape,
     BrushClick,
+    BbrushMaskGrowShrinkHotkey,
 
     BrushDepthScale,
     BrushDepthMove,

@@ -15,8 +15,16 @@ _MODIFIER_SHELF_SYNC_KEYS = (
     "RIGHT_ALT",
 )
 
-# Must match what register_addon_keymaps adds (LMB/RMB + Ctrl+W + modifier PRESS/RELEASE pairs).
-_EXPECTED_BBRUSH_KEY_ITEM_COUNT = 3 + len(_MODIFIER_SHELF_SYNC_KEYS) * 2
+# Must match what register_addon_keymaps adds (LMB/RMB + Ctrl+W + mask grow/shrink + modifier pairs).
+_MASK_GROW_SHRINK_KEYS = (
+    ("EQUAL", "GROW"),
+    ("MINUS", "SHRINK"),
+    ("NUMPAD_PLUS", "GROW"),
+    ("NUMPAD_MINUS", "SHRINK"),
+)
+_EXPECTED_BBRUSH_KEY_ITEM_COUNT = (
+    3 + len(_MASK_GROW_SHRINK_KEYS) + len(_MODIFIER_SHELF_SYNC_KEYS) * 2
+)
 
 
 class BbrushSyncBrushShelfModifiers(bpy.types.Operator):
@@ -43,6 +51,7 @@ _BBRUSH_KMI_IDNAMES = frozenset(
         "sculpt.bbrush_left_mouse",
         "sculpt.bbrush_right_mouse",
         "sculpt.bbrush_face_sets_create_zbrush",
+        "sculpt.bbrush_mask_grow_shrink",
         BbrushSyncBrushShelfModifiers.bl_idname,
     }
 )
@@ -134,6 +143,18 @@ class BrushKeymap:
             alt=False,
         )
         keys.append((km, kmi))
+
+        for key_type, filter_type in _MASK_GROW_SHRINK_KEYS:
+            kmi = km.keymap_items.new(
+                "sculpt.bbrush_mask_grow_shrink",
+                key_type,
+                "PRESS",
+                ctrl=True,
+                shift=False,
+                alt=False,
+            )
+            kmi.properties.filter_type = filter_type
+            keys.append((km, kmi))
 
         # -1 = ignore modifier state. Defaults (0) mean "modifier must be off", so e.g.
         # LEFT_SHIFT+PRESS would not match while Ctrl is held — breaks Ctrl then Shift.

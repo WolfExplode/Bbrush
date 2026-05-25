@@ -285,6 +285,160 @@ def sculpt_face_sets_create_zbrush_ctrl_w(context) -> set:
         return {"CANCELLED"}
 
 
+def _get_sculpt_face_set_attribute(mesh):
+    return mesh.attributes.get(".sculpt_face_set") or mesh.attributes.get("sculpt_face_set")
+
+
+def _view3d_context_from_event(context, event):
+    """(area, region, space, mouse_region) for raycast / face_set_edit, or Nones."""
+    if event is None:
+        return None, None, None, None
+
+    area = getattr(context, "area", None)
+    region = getattr(context, "region", None)
+    region_data = getattr(context, "region_data", None)
+    if (
+        area is not None
+        and area.type == "VIEW_3D"
+        and region is not None
+        and region.type == "WINDOW"
+        and region_data is not None
+    ):
+        space = area.spaces.active
+        if space is not None and space.type == "VIEW_3D":
+            return area, region, space, (event.mouse_region_x, event.mouse_region_y)
+
+    from .utils import find_mouse_in_area
+
+    area = find_mouse_in_area(context, event)
+    if area is None or area.type != "VIEW_3D":
+        return None, None, None, None
+
+    region = None
+    for reg in area.regions:
+        if reg.type == "WINDOW":
+            region = reg
+            break
+    if region is None:
+        return None, None, None, None
+
+    space = area.spaces.active
+    if space is None or space.type != "VIEW_3D":
+        return None, None, None, None
+
+    # Screen/window coords → region-local (only when context.region is not already set).
+    mouse = (
+        event.mouse_x - area.x - region.x,
+        event.mouse_y - area.y - region.y,
+    )
+    return area, region, space, mouse
+
+
+def _view3d_override_for_event(context, event):
+    """Build temp_override dict + mouse for sculpt ops in the 3D view under the cursor."""
+    area, region, space, mouse = _view3d_context_from_event(context, event)
+    if area is None:
+        return None, None
+
+    obj = getattr(context, "sculpt_object", None)
+    override = {
+        "window": context.window,
+        "screen": context.screen,
+        "area": area,
+        "region": region,
+        "space_data": space,
+        "region_data": space.region_3d,
+        "scene": context.scene,
+        "view_layer": context.view_layer,
+    }
+    if obj is not None:
+        override["active_object"] = obj
+        override["object"] = obj
+    return override, mouse
+
+
+def _read_face_set_id_at_poly(mesh, attr, poly_index: int) -> int | None:
+    domain = getattr(attr, "domain", "FACE")
+    try:
+        if domain == "FACE":
+            if poly_index < 0 or poly_index >= len(attr.data):
+                return None
+            return int(attr.data[poly_index].value)
+        if domain == "POINT":
+            if poly_index < 0 or poly_index >= len(mesh.polygons):
+                return None
+            vert_index = mesh.polygons[poly_index].vertices[0]
+            if vert_index >= len(attr.data):
+                return None
+            return int(attr.data[vert_index].value)
+    except (AttributeError, TypeError, ValueError, IndexError):
+        pass
+    return None
+
+
+def sculpt_face_set_pick_under_cursor(context, event):
+    """Ray hit under cursor in the 3D view: (poly_index, face_set_id) or (None, None)."""
+    from .utils import object_ray_cast
+
+    area, _region, _space, mouse = _view3d_context_from_event(context, event)
+    if area is None or mouse is None:
+        return None, None
+
+    obj = getattr(context, "sculpt_object", None)
+    if obj is None or obj.type != "MESH":
+        return None, None
+
+    override, _ = _view3d_override_for_event(context, event)
+    if override is None:
+        return None, None
+
+    with context.temp_override(**override):
+        depsgraph = context.evaluated_depsgraph_get()
+        object_eval = obj.evaluated_get(depsgraph)
+        result, _location, _normal, index = object_ray_cast(object_eval, context, mouse)
+
+    if not result or index is None or index < 0:
+        return None, None
+
+    mesh = object_eval.data
+    attr = _get_sculpt_face_set_attribute(mesh) or _get_sculpt_face_set_attribute(obj.data)
+    if attr is None:
+        return index, None
+
+    return index, _read_face_set_id_at_poly(mesh, attr, index)
+
+
+def sculpt_face_set_id_under_cursor(context, event) -> int | None:
+    """Face set ID under the cursor, or None if not over a painted face set (id > 0)."""
+    _poly_index, face_set_id = sculpt_face_set_pick_under_cursor(context, event)
+    if _poly_index is None or face_set_id is None or face_set_id <= 0:
+        return None
+    return face_set_id
+
+
+def sculpt_face_set_grow_shrink(context, event, mode: str, *, face_set_id: int | None = None) -> set:
+    """Grow or shrink the face set under the cursor (mode: GROW or SHRINK)."""
+    override, _mouse = _view3d_override_for_event(context, event)
+    if override is None:
+        return {"CANCELLED"}
+
+    try:
+        with context.temp_override(**override):
+            res = bpy.ops.sculpt.face_set_edit("INVOKE_DEFAULT", mode=mode)
+            if "FINISHED" in res:
+                return res
+            if face_set_id is not None:
+                return bpy.ops.sculpt.face_set_edit(
+                    "EXEC_DEFAULT",
+                    True,
+                    active_face_set=face_set_id,
+                    mode=mode,
+                )
+            return res
+    except RuntimeError:
+        return {"CANCELLED"}
+
+
 def _face_set_change_visibility_invoke(context, mode: str) -> set:
     try:
         if context.area and context.region:

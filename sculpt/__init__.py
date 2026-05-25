@@ -5,6 +5,7 @@ from . import brush
 from .keymap import BbrushSyncBrushShelfModifiers, BrushKeymap
 from .left_mouse import LeftMouse
 from .right_mouse import RightMouse
+from .secondary_brush import BbrushShiftSecondaryBrushWheel
 from .update_brush_shelf import UpdateBrushShelf, brush_shelf
 from ..debug import debug_log
 from ..utils import refresh_ui
@@ -60,7 +61,7 @@ def activate_sculpt_brush_shelf(context, event=None):
 
 def deactivate_sculpt_brush_shelf(context):
     """Restore Blender's default sculpt tool shelf when leaving sculpt mode."""
-    from .shift_secondary_brush import clear_shift_secondary_override
+    from .secondary_brush import clear_shift_secondary_override
 
     clear_shift_secondary_override(context)
     if "ORIGINAL" in brush_shelf:
@@ -70,7 +71,7 @@ def deactivate_sculpt_brush_shelf(context):
 
 def unregister_addon_runtime(context):
     """Full teardown when the add-on is disabled (keymaps + shelf)."""
-    from .shift_secondary_brush import clear_shift_secondary_override
+    from .secondary_brush import clear_shift_secondary_override
 
     debug_log("unregister_addon_runtime")
     clear_shift_secondary_override(context)
@@ -257,6 +258,7 @@ class_list = [
     FaceSetsCreateZbrushCtrlW,
     FixBbrushError,
     BbrushSyncBrushShelfModifiers,
+    BbrushShiftSecondaryBrushWheel,
     LeftMouse,
     RightMouse,
 ]

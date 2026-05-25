@@ -22,8 +22,15 @@ _MASK_GROW_SHRINK_KEYS = (
     ("NUMPAD_PLUS", "GROW"),
     ("NUMPAD_MINUS", "SHRINK"),
 )
+_SHIFT_SECONDARY_WHEEL_KEYS = (
+    ("WHEELUPMOUSE", 1),
+    ("WHEELDOWNMOUSE", -1),
+)
 _EXPECTED_BBRUSH_KEY_ITEM_COUNT = (
-    3 + len(_MASK_GROW_SHRINK_KEYS) + len(_MODIFIER_SHELF_SYNC_KEYS) * 2
+    3
+    + len(_MASK_GROW_SHRINK_KEYS)
+    + len(_MODIFIER_SHELF_SYNC_KEYS) * 2
+    + len(_SHIFT_SECONDARY_WHEEL_KEYS)
 )
 
 
@@ -38,7 +45,7 @@ class BbrushSyncBrushShelfModifiers(bpy.types.Operator):
         return context.mode == "SCULPT"
 
     def invoke(self, context, event):
-        from .shift_secondary_brush import sync_shift_secondary_brush
+        from .secondary_brush import sync_shift_secondary_brush
         from .update_brush_shelf import UpdateBrushShelf
 
         UpdateBrushShelf.update_brush_shelf(context, event)
@@ -52,6 +59,7 @@ _BBRUSH_KMI_IDNAMES = frozenset(
         "sculpt.bbrush_right_mouse",
         "sculpt.bbrush_face_sets_create_zbrush",
         "sculpt.bbrush_mask_grow_shrink",
+        "sculpt.bbrush_shift_secondary_brush_wheel",
         BbrushSyncBrushShelfModifiers.bl_idname,
     }
 )
@@ -168,5 +176,18 @@ class BrushKeymap:
                     **_any_mod,
                 )
                 keys.append((km, kmi))
+
+        for wheel_type, direction in _SHIFT_SECONDARY_WHEEL_KEYS:
+            kmi = km.keymap_items.new(
+                "sculpt.bbrush_shift_secondary_brush_wheel",
+                wheel_type,
+                "PRESS",
+                shift=True,
+                ctrl=False,
+                alt=False,
+                head=True,
+            )
+            kmi.properties.direction = direction
+            keys.append((km, kmi))
 
         debug_log("addon keymaps registered", len(keys))

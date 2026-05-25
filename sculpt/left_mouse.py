@@ -38,7 +38,7 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
 
         only_shift = event.shift and not event.alt and not event.ctrl
         if only_shift and self._press_in_model:
-            from .shift_secondary_brush import ensure_shift_secondary_for_sculpt
+            from .secondary_brush import ensure_shift_secondary_for_sculpt
 
             ensure_shift_secondary_for_sculpt(context, event)
 
@@ -170,7 +170,7 @@ class LeftMouse(bpy.types.Operator, ManuallyManageEvents):
     def brush_stroke(context, event):
         only_shift = event.shift and not event.alt and not event.ctrl
         if only_shift:
-            from .shift_secondary_brush import (
+            from .secondary_brush import (
                 ensure_shift_secondary_for_sculpt,
                 mark_shift_secondary_sculpt_used,
             )

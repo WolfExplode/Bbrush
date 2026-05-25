@@ -1,11 +1,19 @@
 """Blender 5.1+: Shift+LMB sculpt uses a secondary brush slot; Shift release restores primary.
 
 Secondary is not activated on Shift alone (so Shift+F and other Shift shortcuts stay on the primary brush).
+Shift + scroll wheel activates the secondary slot to resize it.
 """
 
 import bpy
 
 from ..debug import debug_log
+from ..utils import refresh_ui
+from .right_mouse import (
+    _apply_sculpt_brush_pixel_size,
+    _effective_sculpt_brush_pixel_size,
+)
+
+_WHEEL_SIZE_STEP_PX = 10
 
 # Default secondary when slot has never been set: try custom asset, then Essentials Smooth.
 _DEFAULT_SECONDARY_CUSTOM_REF = (
@@ -164,3 +172,38 @@ def clear_shift_secondary_override(context):
         context,
         remember_secondary=getattr(brush_runtime, "shift_secondary_used_for_sculpt", False),
     )
+
+
+class BbrushShiftSecondaryBrushWheel(bpy.types.Operator):
+    bl_idname = "sculpt.bbrush_shift_secondary_brush_wheel"
+    bl_label = "Resize Secondary Brush (Shift+Wheel)"
+    bl_description = "Hold Shift and scroll to change secondary brush size"
+    bl_options = {"REGISTER", "INTERNAL"}
+
+    direction: bpy.props.IntProperty(
+        name="Direction",
+        description="Wheel direction: 1 = larger, -1 = smaller",
+        default=1,
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "SCULPT" and bpy.app.version >= (5, 1, 0)
+
+    def invoke(self, context, event):
+        if event is None:
+            return {"CANCELLED"}
+        if not _shift_only(event):
+            return {"PASS_THROUGH"}
+
+        if not ensure_shift_secondary_for_sculpt(context, event):
+            return {"PASS_THROUGH"}
+
+        current = _effective_sculpt_brush_pixel_size(context)
+        if current is None:
+            return {"CANCELLED"}
+
+        step = max(1, _WHEEL_SIZE_STEP_PX)
+        _apply_sculpt_brush_pixel_size(context, current + self.direction * step)
+        refresh_ui(context)
+        return {"FINISHED"}

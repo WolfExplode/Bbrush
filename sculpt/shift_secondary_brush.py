@@ -51,11 +51,31 @@ def _shift_only(event) -> bool:
     return event.shift and not event.ctrl and not event.alt
 
 
+def is_relax_slide_brush(context) -> bool:
+    """Relax Slide uses Blender's own Shift behavior (relax geometry), not the secondary brush slot."""
+    ts = getattr(context.tool_settings, "sculpt", None)
+    if ts is None:
+        return False
+
+    br = ts.brush
+    if br is not None:
+        if getattr(br, "sculpt_brush_type", None) == "TOPOLOGY":
+            return True
+        if br.name == "Relax Slide":
+            return True
+
+    ref = ts.brush_asset_reference
+    rel = getattr(ref, "relative_asset_identifier", "") or ""
+    return rel.endswith("/Relax Slide") or rel.endswith("\\Relax Slide")
+
+
 def ensure_shift_secondary_for_sculpt(context, event) -> bool:
     """Activate secondary before the first sculpt stroke (Shift+LMB, not Shift alone)."""
     if bpy.app.version < (5, 1, 0):
         return False
     if event is None or not _shift_only(event):
+        return False
+    if is_relax_slide_brush(context):
         return False
 
     from . import brush_runtime

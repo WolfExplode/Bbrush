@@ -59,6 +59,10 @@ def _shift_only(event) -> bool:
     return event.shift and not event.ctrl and not event.alt
 
 
+def _ctrl_only(event) -> bool:
+    return event.ctrl and not event.shift and not event.alt
+
+
 def is_relax_slide_brush(context) -> bool:
     """Relax Slide uses Blender's own Shift behavior (relax geometry), not the secondary brush slot."""
     ts = getattr(context.tool_settings, "sculpt", None)
@@ -176,8 +180,8 @@ def clear_shift_secondary_override(context):
 
 class BbrushShiftSecondaryBrushWheel(bpy.types.Operator):
     bl_idname = "sculpt.bbrush_shift_secondary_brush_wheel"
-    bl_label = "Resize Secondary Brush (Shift+Wheel)"
-    bl_description = "Hold Shift and scroll to change secondary brush size"
+    bl_label = "Resize Secondary/Mask Brush (Shift/Ctrl+Wheel)"
+    bl_description = "Hold Shift (secondary brush) or Ctrl (mask brush) and scroll to change brush size"
     bl_options = {"REGISTER", "INTERNAL"}
 
     direction: bpy.props.IntProperty(
@@ -193,10 +197,13 @@ class BbrushShiftSecondaryBrushWheel(bpy.types.Operator):
     def invoke(self, context, event):
         if event is None:
             return {"CANCELLED"}
-        if not _shift_only(event):
-            return {"PASS_THROUGH"}
+        if _ctrl_only(event):
+            # Ctrl+wheel resizes the mask brush that Ctrl switched to (no secondary slot involved).
+            from . import brush_runtime
 
-        if not ensure_shift_secondary_for_sculpt(context, event):
+            if brush_runtime.brush_mode != "MASK":
+                return {"PASS_THROUGH"}
+        elif not _shift_only(event) or not ensure_shift_secondary_for_sculpt(context, event):
             return {"PASS_THROUGH"}
 
         current = _effective_sculpt_brush_pixel_size(context)

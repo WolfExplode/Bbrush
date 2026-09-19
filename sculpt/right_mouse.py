@@ -72,33 +72,17 @@ class RightMouse(bpy.types.Operator, ManuallyManageEvents):
             return {"FINISHED"}
         debug_log(self.bl_idname)
 
-        self._rmb_size_at_press = _effective_sculpt_brush_pixel_size(context)
-        self._rmb_resizing = False
-
         context.window_manager.modal_handler_add(self)
         self.start_manually_manage_events(event)
         return {'RUNNING_MODAL'}
 
     def modal(self, context, event):
         from . import UpdateBrushShelf
-        from . import brush_runtime
 
         UpdateBrushShelf.update_brush_shelf(context, event)
 
         is_moving = self.check_is_moving(event)
         is_release = event.value == "RELEASE" and event.type == "RIGHTMOUSE"
-
-        if getattr(self, "_rmb_resizing", False):
-            if is_release:
-                self._rmb_resizing = False
-                return {"FINISHED"}
-            if self._rmb_size_at_press is not None:
-                delta_x = event.mouse_x - self.start_mouse.x
-                _apply_sculpt_brush_pixel_size(
-                    context, self._rmb_size_at_press + delta_x,
-                )
-                refresh_ui(context)
-            return {"RUNNING_MODAL"}
 
         if is_release:
             try:
@@ -106,25 +90,9 @@ class RightMouse(bpy.types.Operator, ManuallyManageEvents):
             finally:  # 反直觉写法
                 return {"FINISHED"}
 
-        if (
-            brush_runtime.brush_mode == "MASK"
-            and event.ctrl
-            and is_moving
-        ):
-            ts = context.tool_settings.sculpt
-            br = ts.brush if ts else None
-            if br is not None and self._rmb_size_at_press is not None:
-                self._rmb_resizing = True
-                delta_x = event.mouse_x - self.start_mouse.x
-                _apply_sculpt_brush_pixel_size(
-                    context, self._rmb_size_at_press + delta_x,
-                )
-                refresh_ui(context)
-                return {"RUNNING_MODAL"}
-
         if is_moving:  # 不能使用PASSTHROUGH,需要手动指定事件
             # Removed features:
             # - RMB drag rotates view
-            # - Ctrl+RMB drag zooms view (replaced by mask brush resize when mask shelf is active)
+            # - Ctrl+RMB drag zooms view / resizes the mask brush (Ctrl+wheel resizes it now)
             return {"PASS_THROUGH"}
         return {"RUNNING_MODAL"}

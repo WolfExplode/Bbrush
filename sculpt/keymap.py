@@ -30,7 +30,7 @@ _EXPECTED_BBRUSH_KEY_ITEM_COUNT = (
     3
     + len(_MASK_GROW_SHRINK_KEYS)
     + len(_MODIFIER_SHELF_SYNC_KEYS) * 2
-    + len(_SHIFT_SECONDARY_WHEEL_KEYS)
+    + len(_SHIFT_SECONDARY_WHEEL_KEYS) * 2
 )
 
 
@@ -178,16 +178,16 @@ class BrushKeymap:
                 keys.append((km, kmi))
 
         for wheel_type, direction in _SHIFT_SECONDARY_WHEEL_KEYS:
-            kmi = km.keymap_items.new(
-                "sculpt.bbrush_shift_secondary_brush_wheel",
-                wheel_type,
-                "PRESS",
-                shift=True,
-                ctrl=False,
-                alt=False,
-                head=True,
-            )
-            kmi.properties.direction = direction
-            keys.append((km, kmi))
+            for mods in ({"shift": True, "ctrl": False}, {"shift": False, "ctrl": True}):
+                kmi = km.keymap_items.new(
+                    "sculpt.bbrush_shift_secondary_brush_wheel",
+                    wheel_type,
+                    "PRESS",
+                    alt=False,
+                    head=True,
+                    **mods,
+                )
+                kmi.properties.direction = direction
+                keys.append((km, kmi))
 
         debug_log("addon keymaps registered", len(keys))
